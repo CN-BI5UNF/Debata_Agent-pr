@@ -621,28 +621,6 @@ async def test_persona_refine_messages_keep_history_before_current_user():
     assert result.refined_count == 3
 
 
-def test_persona_edit_history_append_never_trims_long_history():
-    from ui.wizard.context import append_persona_edit_history
-
-    history: list[dict[str, str]] = []
-    for idx in range(12):
-        history = append_persona_edit_history(
-            history,
-            f"第 {idx} 轮用户消息",
-            f"<voice>第 {idx} 轮回复</voice>",
-        )
-
-    updated = append_persona_edit_history(history, "本轮用户消息", "<voice>本轮回复</voice>")
-
-    assert len(updated) == 26
-    assert updated[0] == {"role": "user", "content": "第 0 轮用户消息"}
-    assert updated[1] == {"role": "assistant", "content": "<voice>第 0 轮回复</voice>"}
-    assert updated[-2:] == [
-        {"role": "user", "content": "本轮用户消息"},
-        {"role": "assistant", "content": "<voice>本轮回复</voice>"},
-    ]
-
-
 @pytest.mark.asyncio
 async def test_persona_refine_keeps_all_long_history_messages():
     provider = _PersonaFakeProvider(_PERSONA_XML)

@@ -238,8 +238,8 @@ Runtime.shutdown() → 反序关闭
 跑测试：
 
 ```bash
-pip install -e ".[dev,gui]"
-venv/Scripts/python -m pytest tests/ -q --ignore=tests/test_kv_cache_real.py
+uv sync --extra dev
+uv run python -m pytest tests/ -q --ignore=tests/test_kv_cache_real.py
 ```
 
 ---

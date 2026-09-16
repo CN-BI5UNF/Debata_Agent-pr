@@ -255,7 +255,8 @@ class Runtime:
         from providers import ProviderRegistry
 
         self.provider_registry = ProviderRegistry()
-        self.provider_registry.load_presets(self.paths.PROVIDER_PRESETS_DIR)
+        # 内置预设 + 数据目录里的用户预设（同名覆盖）
+        self.provider_registry.load_presets_for(self.paths)
         self.provider_registry.build_from_config(self.config.providers, self.secrets)
         self.providers = {
             name: self.provider_registry.get(name)
@@ -447,6 +448,7 @@ class Runtime:
             "behavior_cfg": self.config.behavior,
             "features_cfg": self.config.features,
             "whitelist": adapter_cfg.whitelist,
+            "blacklist": getattr(adapter_cfg, "blacklist", None),
             "emoji_dir": self.paths.EMOJI_DIR,
             "workspace_dir": self.paths.WORKSPACE_DIR,
             "rate_limiter": self.rate_limiter,

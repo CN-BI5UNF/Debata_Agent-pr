@@ -61,6 +61,24 @@ class WhitelistConfig(StrictModel):
     """仅在 mode=whitelist 下生效：允许的群号列表。"""
 
 
+class BlacklistConfig(StrictModel):
+    """入站黑名单。命中即丢弃，优先级高于 whitelist 与管理员审核。
+
+    与 whitelist 的分工：whitelist 决定「谁能用」，blacklist 决定「谁永远不能用」。
+    即使 whitelist.mode=open（对所有人开放），黑名单里的对象也不会触发任何回复，
+    因此把骚扰账号 / 不希望被 AI 接话的群丢进来即可，无需收紧整体开放策略。
+    """
+
+    enabled: bool = False
+    """关掉时整份名单不生效，方便临时放行而不丢名单内容。"""
+
+    qq_ids: list[int] = Field(default_factory=list)
+    """被拉黑的 QQ 号：私聊直接丢弃，群聊中该成员的发言也不触发回复。"""
+
+    group_ids: list[int] = Field(default_factory=list)
+    """被拉黑的群号：该群所有消息一律丢弃。"""
+
+
 class NapCatAdapterConfig(StrictModel):
     type: Literal["napcat"] = "napcat"
     enabled: bool = True
@@ -179,6 +197,9 @@ class NapCatAdapterConfig(StrictModel):
     # 白名单
     whitelist: WhitelistConfig = Field(default_factory=WhitelistConfig)
 
+    # 黑名单（优先级高于白名单）
+    blacklist: BlacklistConfig = Field(default_factory=BlacklistConfig)
+
 
 # 未来扩展：Union[NapCatAdapterConfig, DiscordAdapterConfig, ...]
 AdapterConfig = Annotated[NapCatAdapterConfig, Field(discriminator="type")]
@@ -193,6 +214,21 @@ ProtocolType = Literal["openai_compat", "anthropic"]
 """支持的协议类型。其它厂商（gemini / volcengine / qwen / glm 等）都走 openai_compat。
 要新增协议须先在 providers/registry.py 的 PROTOCOL_REGISTRY 注册具体实现。"""
 
+ReasoningStyle = Literal[
+    "thinking_extra_body", "qwen_enable_thinking", "openai_native", "none"
+]
+"""向 OpenAI 兼容端点传达思考开关的方式：
+
+    thinking_extra_body   DeepSeek/GLM 风格，发 extra_body={"thinking": {"type": ...}}
+    qwen_enable_thinking  通义千问，发 extra_body={"enable_thinking": bool}
+    openai_native         不发任何字段（OpenAI o 系列隐式启用）
+    none                  不发任何字段，且明确不猜
+
+为何需要它：``none`` 与 ``openai_native`` 行为相同，但语义不同——前者表示
+"这是个不认识的中转站，别塞厂商私有字段"，后者表示"这是 OpenAI 官方端点"。
+没有这个字段时，无 preset 的自定义 provider 会落到 thinking_extra_body 默认值，
+把 ``{"thinking": {"type": "disabled"}}`` 发给中转站，严格网关会直接 400。"""
+
 
 class ProviderConfig(StrictModel):
     """LLM 提供商配置。
@@ -200,6 +236,8 @@ class ProviderConfig(StrictModel):
     两种使用方式：
         1. 引用内置预设：只填 preset 和 api_key_id
         2. 完全自定义：填 protocol、base_url、api_key_id（preset 留空）
+
+    两者可混用：preset 提供默认值，同名字段就地覆盖（常见于代理 / 中转站 URL）。
     """
 
     preset: str | None = None
@@ -222,6 +260,13 @@ class ProviderConfig(StrictModel):
 
     timeout_seconds: float = 120.0
     """整体请求超时（秒）。流式响应的首 token 超时另由 AgentConfig.first_token_timeout_seconds 控制。"""
+
+    reasoning_style: ReasoningStyle | None = None
+    """思考参数风格，仅 openai_compat 协议生效。
+
+    留空时：有 preset 则取 preset.yaml 的值；无 preset（自定义中转站）取 ``none``，
+    即不向端点发送任何厂商私有字段——这是能安全接入未知网关的前提。
+    """
 
     @model_validator(mode="after")
     def validate_provider(self) -> ProviderConfig:

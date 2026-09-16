@@ -50,7 +50,7 @@ from adapters.base import IAdapter
 from adapters.types import Target as Target
 from agents import ChatAgent, Persona, SummaryAgent, build_messages
 from agents.base import RuntimeEventCallback
-from app_config.schema import BehaviorConfig, FeaturesConfig, WhitelistConfig
+from app_config.schema import BehaviorConfig, BlacklistConfig, FeaturesConfig, WhitelistConfig
 from memory import (
     ArchiveStore,
     HistoryManager,
@@ -192,6 +192,7 @@ class MessagePipeline(
         behavior_cfg: BehaviorConfig,
         features_cfg: FeaturesConfig,
         whitelist: WhitelistConfig | None = None,
+        blacklist: BlacklistConfig | None = None,
         emoji_dir: Path | None = None,
         workspace_dir: Path | None = None,
         rate_limiter: RateLimiter | None = None,
@@ -226,6 +227,11 @@ class MessagePipeline(
         self.whitelist = whitelist or WhitelistConfig()
         self._whitelist_qq_ids = set(self.whitelist.qq_ids)
         self._whitelist_group_ids = set(self.whitelist.group_ids)
+        # blacklist=None 时视为空名单（不拦截任何人）
+        self.blacklist = blacklist or BlacklistConfig()
+        self._blacklist_qq_ids: set[int] = set()
+        self._blacklist_group_ids: set[int] = set()
+        self._sync_blacklist()
         self.emoji_dir = emoji_dir
         self.workspace_dir = workspace_dir
         self.rate_limiter = rate_limiter
@@ -266,6 +272,20 @@ class MessagePipeline(
         self._group_members_cache: dict[str, tuple[float, set[int]]] = {}
         self._group_members_ttl_seconds: float = 300.0
         self._warn_context_compaction_invariants()
+
+    def _sync_blacklist(self) -> None:
+        """把黑名单配置摊平成两个 set，供入站热路径 O(1) 查询。"""
+        if self.blacklist.enabled:
+            self._blacklist_qq_ids = {int(x) for x in self.blacklist.qq_ids}
+            self._blacklist_group_ids = {int(x) for x in self.blacklist.group_ids}
+        else:
+            self._blacklist_qq_ids = set()
+            self._blacklist_group_ids = set()
+
+    def apply_blacklist(self, blacklist: BlacklistConfig) -> None:
+        """热更新黑名单（WebUI 保存后立即生效，不需要重启）。"""
+        self.blacklist = blacklist
+        self._sync_blacklist()
 
     def mark_activity(self) -> None:
         """刷新活动时间。主动思考只在足够空闲后触发。"""

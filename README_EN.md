@@ -7,12 +7,12 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/binglang001/Debata_Agent/actions/workflows/test.yml)
-[![GUI](https://img.shields.io/badge/UI-PySide6-blueviolet.svg)](#)
+[![WebUI](https://img.shields.io/badge/UI-WebUI%20%28FastAPI%29-blueviolet.svg)](#)
 [![Stars](https://img.shields.io/github/stars/binglang001/Debata_Agent?style=social)](https://github.com/binglang001/Debata_Agent)
 
 <br>
 
-<img src="https://raw.githubusercontent.com/binglang001/Debata_Agent/main/ui/icon.png" width="128" alt="Debata">
+<img src="https://raw.githubusercontent.com/binglang001/Debata_Agent/main/docs/images/webui-icon.svg" width="128" alt="Debata">
 
 </div>
 
@@ -38,7 +38,7 @@ Debata_Agent doesn't come with a fixed personality. You give it one, and it beco
 | Tone | "Of course! 😊" | "?" / "nah" / "6" / "whatever" |
 | Style | Same for everyone | **Switches based on relationship** (close friend vs stranger vs elder) |
 | Initiative | Passive | Decides on its own when to speak |
-| Config | Edit code | **GUI wizard + settings, instant save** |
+| Config | Edit code | **Browser wizard + settings, instant save** |
 
 ## Quick start
 
@@ -46,14 +46,14 @@ Debata_Agent doesn't come with a fixed personality. You give it one, and it beco
 git clone https://github.com/binglang001/Debata_Agent.git
 cd Debata_Agent
 
-python -m venv venv
-source venv/bin/activate    # macOS / Linux
-venv\Scripts\activate       # Windows
-
-pip install -e ".[gui]"
-python main.py              # First run opens the setup wizard
-python main.py --no-gui     # Headless mode for servers
+python -m pip install uv
+uv sync
+uv run main.py              # Starts the WebUI on 0.0.0.0:8000
 ```
+
+The terminal prints the access URLs and an access token; open either URL in a browser.
+Useful flags: `--port 9000`, `--host 127.0.0.1`, `--token <fixed-token>`,
+`--no-auth`, `--no-gui` (headless Runtime, no WebUI).
 
 ### Requirements
 
@@ -74,25 +74,31 @@ python main.py --no-gui     # Headless mode for servers
 - **13 LLM providers** — OpenAI / Anthropic Claude / DeepSeek / GLM / Qwen / Volcengine / Gemini / Moonshot / SiliconFlow / OpenRouter / Groq / Together / xAI
 - **Per-agent model config** — chat, proactive thinking, and summarization can each use different models
 - **Optional modules** — vision, TTS, weather, web search, RAG long-term memory (ASR handled by NapCat)
-- **GUI** — frameless rounded window, dark/light themes, setup wizard, 7-page dashboard, instant-save settings
+- **WebUI** — browser console, dark/light themes, setup wizard, 9-page dashboard, instant-save settings, live log/chat streaming, token auth for LAN access
 - **AES-256-GCM + RSA-2048** encrypted secrets via OS keyring, no passwords needed
 - **AI-assisted persona creation** — guided, streaming preview, multi-round refinement
 - **Plugin system** — local models (VoxCPM2 TTS, sentence-transformers embedding) with install guides
 
 ## Deployment
 
-### Windows desktop
+### Desktop (any OS with a browser)
 
 ```bash
-pip install -e ".[gui]"
-python main.py
+uv sync
+uv run main.py
 ```
 
-### Linux server (headless)
+### Linux server
 
 ```bash
-pip install -e .
-python main.py --no-gui
+uv sync
+uv run main.py --host 0.0.0.0 --port 8000
+```
+
+### Fully headless (no WebUI)
+
+```bash
+uv run main.py --no-gui
 ```
 
 ## Project layout
@@ -108,7 +114,7 @@ Debata_Agent/
 ├── features/        Vision, TTS, weather, search, embedding
 ├── core/            Event bus, message pipeline, runtime lifecycle
 ├── app_config/      Configuration and encrypted secrets
-├── ui/              PySide6 GUI, setup wizard, dashboard, tray
+├── webui/           WebUI (FastAPI backend, page routes, static frontend)
 ├── plugins/         Local model plugins
 ├── personas/        Persona files
 ├── docs/            Developer documentation
@@ -143,7 +149,8 @@ WantedBy=multi-user.target
 - [KV Cache Benchmark](docs/kv_cache_benchmark.md) — real-world hit rate data
 - [Adapter Development](docs/adapter_development.md) — adding new chat platforms
 - [Provider Development](docs/provider_development.md) — adding new LLM backends
-- [UI Style Guide](docs/ui_style_guide.md) — design principles and component specs
+- [WebUI Guide](docs/webui.md) — pages, API surface, extending the console
+- [UI Style Guide](docs/ui_style_guide.md) — design principles and color specs
 
 ## License
 

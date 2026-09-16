@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/binglang001/Debata_Agent/actions/workflows/test.yml)
-[![GUI](https://img.shields.io/badge/UI-PySide6-blueviolet.svg)]
+[![WebUI](https://img.shields.io/badge/UI-WebUI%20%28FastAPI%29-blueviolet.svg)]
 [![Stars](https://img.shields.io/github/stars/binglang001/Debata_Agent?style=social)](https://github.com/binglang001/Debata_Agent)
 
 ---
@@ -33,7 +33,7 @@
 | 边界  | 「好的！」  | 「？」 / 「嗯」 / 「6」 / 「算了」  |
 | 风格  | 对所有人一样 | 对长辈/死党/陌生人**四种切换**      |
 | 主动性 | 被动回复   | 自主判断要不要开口               |
-| 配置  | 改代码    | **图形向导 + 设置页即时保存**      |
+| 配置  | 改代码    | **浏览器向导 + 设置页即时保存**     |
 
 ## 项目部署
 
@@ -42,7 +42,7 @@
 - **Python** 3.11 或更高
 - **NapCat**  — QQ 协议端 注:[安装指南(hyperlink)](https://napneko.github.io/guide/start-install)
 - **LLM API 密钥** — 推荐 DeepSeek（中文好、价格低、缓存命中后便宜）
-- Windows / macOS / Linux 均可（GUI 需要图形环境; 服务器用 `--no-gui`）
+- Windows / macOS / Linux 均可（浏览器控制台，无需图形环境；纯命令行跑 `--no-gui`）
 
 ### 部署命令 (各OS通用)
 
@@ -51,11 +51,31 @@ git clone https://github.com/binglang001/Debata_Agent.git
 cd Debata_Agent
 python -m pip install uv
 uv sync
-uv sync --extra gui # 如果不需要图形化(例如服务器/docker)，这一步可以省略
 uv run main.py
 ```
 
-服务器或无图形环境，可以跳过`uv sync --extra gui`，在`uv run main.py`后加`--no-gui`.
+启动后终端会打印**访问地址**和**访问令牌**，浏览器打开即可（默认监听 `0.0.0.0:8000`，局域网内任何设备都能访问）:
+
+```
+================================================================
+  Debata_Agent WebUI 已启动
+================================================================
+  监听        : 0.0.0.0:8000
+  访问地址    : http://127.0.0.1:8000
+  访问地址    : http://192.168.1.23:8000
+  访问令牌    : xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+================================================================
+```
+
+常用参数:
+
+```bash
+uv run main.py --port 9000          # 换端口
+uv run main.py --host 127.0.0.1     # 只允许本机访问
+uv run main.py --token 我的固定令牌   # 固定令牌，不自动生成
+uv run main.py --no-auth            # 关闭鉴权（仅限完全可信内网）
+uv run main.py --no-gui             # 纯命令行，不启动 WebUI
+```
 
 本地 ASR/TTS/Embedding 的重依赖不随默认安装拉取; 打开对应模型的安装指引时，Debata 会检查缺失运行包并在后台用当前 venv 补装.
 
@@ -72,13 +92,15 @@ uv run main.py
 
 项目自带语音处理功能:QQ 语音转写使用 NapCat 内置功能.
 
-### 首次配置（图形向导）
+### 首次配置（浏览器向导）
 
-启动后会按顺序问你:
-1. 选主模型（推荐路径 7 步 / 自定义路径最多 9 步）
-2. 可选功能（视觉 / 天气 / 联网搜索 / RAG 长期记忆 …）
-3. 接入 NapCat（地址 + token + 白名单）
-4. 选/创建角色（内置 debata 或调 AI 现场生成）
+第一次启动时检测不到 `config.yaml`，WebUI 会直接给出配置页，填完即可用:
+1. 选主模型（13 个内置预设，或自定义 OpenAI / Anthropic 兼容端点）
+2. 选角色（内置 debata，或稍后在「角色」页导入 zip）
+3. 接入 NapCat（连接模式 + 地址 + token + 入站策略）
+4. 后台 Agent 开关（主动思考 / 滚动摘要 / 人格生成）
+
+之后所有项目都能在「设置」页随时改，不需要重跑向导。
 
 完成后进入仪表盘，常用配置能在设置页调整，无需再跑向导.
 
@@ -95,13 +117,14 @@ Debata_Agent/
 ├── features/        视觉 / TTS / 天气 / 搜索 / Embedding
 ├── core/            事件总线 / 消息管道 / Runtime 生命周期
 ├── app_config/      配置 + AES/RSA 加密密钥
-├── ui/              PySide6 GUI（向导 + 7 页仪表盘 + 托盘）
+├── webui/           WebUI（FastAPI 后端 + 各页路由 + 静态前端）
 ├── plugins/         本地模型插件（TTS / Embedding）
 ├── personas/        人格目录（debata 入 git，其他 gitignore）
 ├── utils/           CQ 解析 / KV 缓存测量 / 时间
 ├── docs/            开发者文档
 ├── tests/           单元 / 集成测试
-└── main.py          入口
+├── webui_server.py  WebUI 独立启动脚本
+└── main.py          入口（默认启动 WebUI）
 ```
 
 ## 文档
@@ -112,7 +135,8 @@ Debata_Agent/
 - [KV 缓存基准](docs/kv_cache_benchmark.md) — 真实命中率数据
 - [提供商开发](docs/provider_development.md) — 接新的 LLM
 - [适配器开发](docs/adapter_development.md) — 接新的聊天平台
-- [UI 风格指南](docs/ui_style_guide.md) — 设计原则与组件规范
+- [WebUI 说明](docs/webui.md) — 页面结构、接口一览、二次开发
+- [UI 风格指南](docs/ui_style_guide.md) — 设计原则与配色规范
 
 ## 设计决策
 
@@ -121,7 +145,8 @@ Debata_Agent/
 - **单一 system + XML 分区**:稳定区前置，让 KV 缓存命中率 > 90%，省 token + 省延迟
 - **「真人不完美」即合法**:不修跑题/改口/忘事，那不是 bug，是体感
 - **加密密钥不要密码**:用户体验优先，密钥存 OS keyring + AES-GCM，密码学保证强度
-- **常用配置尽量 GUI 可改**:常用开关和密钥走设置页即时保存，Persona 文件仍然保留手写空间
+- **常用配置尽量 UI 可改**:常用开关和密钥走设置页即时保存，Persona 文件仍然保留手写空间
+- **黑名单优于白名单**:不想让 AI 接话的人点名拉黑即可，不必为此收紧整体开放策略
 
 ## License
 
@@ -130,8 +155,8 @@ Debata_Agent/
 ## 致谢
 
 - [NapCat](https://github.com/NapNeko/NapCatQQ) — 现代 QQ 协议端
-- [PySide6](https://wiki.qt.io/Qt_for_Python) — Qt 的 Python 绑定
-- [qasync](https://github.com/CabbageDevelopment/qasync) — Qt 事件循环与 asyncio 桥接
+- [FastAPI](https://fastapi.tiangolo.com/) — WebUI 的 HTTP / WebSocket 框架
+- [Uvicorn](https://www.uvicorn.org/) — ASGI 服务器
 - DeepSeek / Anthropic / 智谱 等提供 LLM 服务
 
 ---

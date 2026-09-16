@@ -64,9 +64,9 @@ def _cli_choose(
 
 
 def _cli_load_presets(paths) -> dict[str, Any]:
-    from providers.presets_loader import load_all_presets
+    from providers.presets_loader import load_presets_for
 
-    return load_all_presets(paths.PROVIDER_PRESETS_DIR)
+    return load_presets_for(paths)
 
 
 def _cli_default_model(
