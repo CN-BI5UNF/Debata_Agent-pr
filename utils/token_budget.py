@@ -43,10 +43,19 @@ class TokenEstimator:
         return max(1, total)
 
     def update_calibration(self, estimated: int, actual_prompt_tokens: int) -> None:
+        """用一次真实调用的 (估算, 实际) 反馈修正系数。
+
+        两道护栏，防止一次异常样本把系数带偏（估算器决定上下文预算与压缩时机，
+        一旦跑飞会让压缩策略整体失准）：
+          - 单次 ratio 先夹到 [0.3, 3.0]，挡掉口径错误或含工具循环累加值的样本；
+          - 累计 calib_ratio 再夹到 [0.35, 2.0]。
+        """
         if estimated <= 0 or actual_prompt_tokens <= 0:
             return
         ratio = actual_prompt_tokens / estimated
-        self.calib_ratio = self.calib_ratio * 0.8 + ratio * 0.2
+        ratio = min(3.0, max(0.3, ratio))
+        blended = self.calib_ratio * 0.8 + ratio * 0.2
+        self.calib_ratio = min(2.0, max(0.35, blended))
 
 
 def _estimate_text_raw(text: str, model: str = "") -> int:

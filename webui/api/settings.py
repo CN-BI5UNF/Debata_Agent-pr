@@ -16,8 +16,10 @@ import re
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Body, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
+from app_config import user_error_text
+from webui.config_edit import apply_validated
 from webui.settings_spec import SETTINGS_GROUPS, field_map
 
 from . import providers as providers_api
@@ -96,11 +98,16 @@ async def patch_setting(
     value = _coerce(payload.value, spec)
     cfg = rt.config
     try:
-        set_path_in(cfg, payload.path, value)
         # 借 pydantic 校验一遍，避免写出非法组合（如枚举值拼错）。
-        type(cfg).model_validate(cfg.model_dump())
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"设置值不合法：{e}") from e
+        # 必须改在副本上：直接改内存再校验的话，校验失败虽然回了 400，
+        # 坏值却留在 rt.config 里，会被下一次落盘顺手写进 config.yaml。
+        apply_validated(cfg, lambda draft: set_path_in(draft, payload.path, value))
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=400, detail=f"设置值不合法：{user_error_text(e)}"
+        ) from e
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=f"配置路径不存在：{e}") from e
 
     await asyncio.to_thread(host.save_config)
     await _apply_hot(rt, payload.path, value)
@@ -231,32 +238,42 @@ async def patch_agent(
     if agent is None:
         raise HTTPException(status_code=404, detail=f"没有 {agent_name} 这个 Agent")
 
-    if payload.provider is not None:
-        if payload.provider not in (rt.config.providers or {}):
-            raise HTTPException(
-                status_code=400,
-                detail=f"没有 {payload.provider} 这个提供商，先在「添加提供商」里建好",
-            )
-        agent.provider = payload.provider
-    if payload.model is not None:
-        agent.model = payload.model
-    if payload.temperature is not None:
-        agent.temperature = float(payload.temperature)
-    if payload.top_p is not None:
-        agent.top_p = float(payload.top_p)
-    if payload.max_tokens is not None:
-        agent.max_tokens = int(payload.max_tokens)
-    if payload.first_token_timeout_seconds is not None:
-        agent.first_token_timeout_seconds = float(payload.first_token_timeout_seconds)
-    if payload.reasoning is not None or payload.reasoning_budget is not None:
-        if agent.reasoning is None:
-            from app_config.schema import ReasoningConfig
+    if payload.provider is not None and payload.provider not in (rt.config.providers or {}):
+        raise HTTPException(
+            status_code=400,
+            detail=f"没有 {payload.provider} 这个提供商，先在「添加提供商」里建好",
+        )
 
-            agent.reasoning = ReasoningConfig(enabled=bool(payload.reasoning))
-        elif payload.reasoning is not None:
-            agent.reasoning.enabled = payload.reasoning
-        if payload.reasoning_budget is not None:
-            agent.reasoning.budget = payload.reasoning_budget
+    def mutate(draft: Any) -> None:
+        target = getattr(draft.agents, agent_name)
+        if payload.provider is not None:
+            target.provider = payload.provider
+        if payload.model is not None:
+            target.model = payload.model
+        if payload.temperature is not None:
+            target.temperature = float(payload.temperature)
+        if payload.top_p is not None:
+            target.top_p = float(payload.top_p)
+        if payload.max_tokens is not None:
+            target.max_tokens = int(payload.max_tokens)
+        if payload.first_token_timeout_seconds is not None:
+            target.first_token_timeout_seconds = float(payload.first_token_timeout_seconds)
+        if payload.reasoning is not None or payload.reasoning_budget is not None:
+            if target.reasoning is None:
+                from app_config.schema import ReasoningConfig
+
+                target.reasoning = ReasoningConfig(enabled=bool(payload.reasoning))
+            elif payload.reasoning is not None:
+                target.reasoning.enabled = payload.reasoning
+            if payload.reasoning_budget is not None:
+                target.reasoning.budget = payload.reasoning_budget
+
+    try:
+        apply_validated(rt.config, mutate)
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=400, detail=f"设置值不合法：{user_error_text(e)}"
+        ) from e
 
     await asyncio.to_thread(host.save_config)
     return {"ok": True, "needs_restart": True, "message": f"{agent_name} 已更新，重启后生效"}

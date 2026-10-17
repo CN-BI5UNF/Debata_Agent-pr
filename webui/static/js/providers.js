@@ -180,6 +180,12 @@ export function providerFields(state, { includeId = true, idLocked = false, pres
     disabled: idLocked,
     oninput: (e) => { p.id = e.target.value.trim(); },
   });
+  // 显示名和协议/地址一样会被预设覆盖，切回「自定义」时要还原，所以提前定义。
+  const displayNameInput = h('input', {
+    value: p.display_name || '',
+    oninput: (e) => { p.display_name = e.target.value.trim(); },
+  });
+
   const presetSelect = h('select', {
     onchange: () => {
       const chosen = presetSelect.value;
@@ -255,10 +261,38 @@ export function providerFields(state, { includeId = true, idLocked = false, pres
       : kind === 'ok' ? 'var(--success)' : '';
   };
 
+  // 用户自己填的那份值。选预设会覆盖表单，切回「自定义」必须原样还回来——
+  // 只把协议下拉解禁、值却留着预设的，等于把中转站配成 anthropic：
+  // 上游多半只有 OpenAI 协议，一请求就是 403 "does not allow /v1/messages dispatch"。
+  const customValues = {
+    protocol: p.protocol || 'openai_compat',
+    display_name: p.display_name || '',
+    base_url: p.base_url || '',
+    reasoning_style: p.reasoning_style || '',
+  };
+  const rememberCustom = () => {
+    customValues.protocol = p.protocol || 'openai_compat';
+    customValues.display_name = p.display_name || '';
+    customValues.base_url = p.base_url || '';
+    customValues.reasoning_style = p.reasoning_style || '';
+  };
+  let lastChosen = presetSelect.value;
+
   function syncFromPreset() {
     const chosen = presetSelect.value;
+    // 只有「从自定义切走」这一刻，表单里才是用户自己填的值，值得存下来。
+    if (lastChosen === CUSTOM) rememberCustom();
+    lastChosen = chosen;
     if (chosen === CUSTOM) {
+      p.protocol = customValues.protocol;
+      p.display_name = customValues.display_name;
+      p.base_url = customValues.base_url;
+      p.reasoning_style = customValues.reasoning_style;
+      protocolSelect.value = customValues.protocol;
       protocolSelect.disabled = false;
+      displayNameInput.value = customValues.display_name;
+      baseUrlInput.value = customValues.base_url;
+      styleSelect.value = customValues.reasoning_style;
       return;
     }
     const preset = available.find((x) => x.id === chosen);
@@ -269,6 +303,7 @@ export function providerFields(state, { includeId = true, idLocked = false, pres
     p.reasoning_style = preset.reasoning_style || '';
     protocolSelect.value = preset.protocol;
     protocolSelect.disabled = true;
+    displayNameInput.value = preset.display_name;
     baseUrlInput.value = preset.base_url;
     styleSelect.value = preset.reasoning_style || '';
     if (!p.model && preset.models && preset.models.length) {
@@ -283,10 +318,7 @@ export function providerFields(state, { includeId = true, idLocked = false, pres
   if (includeId) {
     nodes.push(h('div', { class: 'grid grid-2' },
       field('提供商 ID', idInput, idLocked ? 'ID 建好后不可改' : '小写字母开头，可含数字、_、-'),
-      field('显示名', h('input', {
-        value: p.display_name || '',
-        oninput: (e) => { p.display_name = e.target.value.trim(); },
-      })),
+      field('显示名', displayNameInput),
     ));
   }
   nodes.push(
@@ -361,7 +393,10 @@ async function openProviderDialog(existing, onDone) {
       : {
           id: '',
           display_name: '',
-          preset: presets.length ? presets[0].id : null,
+          // 和 CLI、首次向导一致默认 deepseek。原先取 presets[0]，而预设是字母序的，
+          // 于是"默认"落到 anthropic——只改 Base URL 接中转站的用户会被静默锁成
+          // anthropic 协议，请求打到 /v1/messages 直接 403。
+          preset: (presets.find((x) => x.id === 'deepseek') || presets[0] || {}).id || null,
           protocol: 'openai_compat',
           base_url: '',
           model: '',

@@ -4,10 +4,13 @@
 import { h, fill, card, empty, statCard, formatTime } from '../dom.js';
 import { endpoints } from '../api.js';
 
+// 标签名必须与后端/提示词用词一致：effects=短期影响、cues=线索、todos=待办。
+// 之前 effects 叫「动向」、cues 叫「短期影响」，与 prompt 里的叫法正好错位，
+// 排查缓存问题时极易看错对象。
 const TABS = [
-  ['effects', '动向'],
-  ['cues', '短期影响'],
-  ['todos', '待办/线索'],
+  ['effects', '短期影响'],
+  ['cues', '线索'],
+  ['todos', '待办'],
   ['profiles', '用户画像'],
   ['monologues', '内心独白'],
   ['trajectories', '整理轨迹'],

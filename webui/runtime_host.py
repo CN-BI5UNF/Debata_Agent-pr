@@ -20,6 +20,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 logger = logging.getLogger(__name__)
 
 STATE_SETUP_REQUIRED = "setup_required"
@@ -78,11 +80,20 @@ class RuntimeHost:
         return load_config(self.build_paths())
 
     def save_config(self, backup: bool = True) -> None:
-        """把内存里的 ``rt.config`` 写回 yaml（等价 GUI 的 ``_save_now``）。"""
-        from app_config.loader import save_config
+        """把内存里的 ``rt.config`` 写回 yaml（等价 GUI 的 ``_save_now``）。
+
+        落盘前再校验一次：调用方漏校验时，宁可这次保存失败，也不能把一份
+        Runtime 下次启动才炸的配置写出去。
+        """
+        from app_config.loader import ConfigError, save_config, user_error_text
+        from webui.config_edit import validate_config
 
         if self.rt is None or self.rt.config is None:
             raise RuntimeError("Runtime 未启动，无法保存配置")
+        try:
+            validate_config(self.rt.config)
+        except ValidationError as e:
+            raise ConfigError(f"配置不合法，已拒绝写入：{user_error_text(e)}") from e
         save_config(self.rt.paths, self.rt.config, backup=backup)
 
     def secrets(self) -> Any:
@@ -567,11 +578,11 @@ def _default_model_for(paths: Any, provider: Any, provider_id: str) -> str:
 
         presets = load_presets_for(paths)
     except Exception:  # noqa: BLE001
-        return "deepseek-v4-flash"
+        return "deepseek-flash"
     preset = presets.get(preset_id)
     if preset is not None and getattr(preset, "models", None):
         return preset.models[0].id
-    return "deepseek-v4-flash"
+    return "deepseek-flash"
 
 
 __all__ = [

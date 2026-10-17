@@ -108,7 +108,7 @@ def test_cli_wizard_writes_minimal_full_config(
     sm.initialize()
 
     assert cfg.agents.chat.provider == "main_provider"
-    assert cfg.agents.chat.model == "deepseek-v4-flash"
+    assert cfg.agents.chat.model == "deepseek-flash"
     assert cfg.agents.proactive is not None
     assert cfg.agents.summary is not None
     assert cfg.features.web_search.enabled is True

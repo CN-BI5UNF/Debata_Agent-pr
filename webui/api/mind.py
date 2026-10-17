@@ -20,9 +20,9 @@ router = APIRouter(prefix="/api/mind", tags=["mind"])
 
 # 标签页 key -> (标题, persona_db 方法, 参数名)
 TABS: dict[str, tuple[str, str, str]] = {
-    "effects": ("动向", "get_active_effects", ""),
-    "todos": ("待办/线索", "get_todos", ""),
-    "cues": ("短期影响", "get_cues", ""),
+    "effects": ("短期影响", "get_active_effects", ""),
+    "todos": ("待办", "get_todos", ""),
+    "cues": ("线索", "get_cues", ""),
     "profiles": ("用户画像", "all_profiles", ""),
     "monologues": ("内心独白", "recent_monologues", "limit"),
     "trajectories": ("整理轨迹", "recent_trajectories", "limit"),

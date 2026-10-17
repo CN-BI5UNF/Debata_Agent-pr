@@ -359,3 +359,48 @@ async def test_patch_endpoint_rejects_undeclared_path():
         )
     assert excinfo.value.status_code == 400
     assert "不认识" in str(excinfo.value.detail)
+
+
+def _config_with_vision() -> RootConfig:
+    cfg = _default_config()
+    # 直接赋值绕过校验：这里要的就是一份「vision 开着且指向真实 provider」的合法配置
+    cfg.features.vision.enabled = True
+    cfg.features.vision.provider = "deepseek_main"
+    return cfg
+
+
+async def test_rejected_patch_leaves_memory_untouched():
+    """被拒绝的 PATCH 不能把内存配置改坏（真实事故的回归测试）。
+
+    旧实现是「先改 rt.config 再校验」：清空 features.vision.provider 会被 schema
+    拒绝、接口也回了 400，但内存里的值已经变成 ''。之后「模型」页换 Agent 的
+    provider 时一次不校验的落盘，就把这份配置写进了 config.yaml，
+    Runtime 下次启动直接起不来（features → vision 校验失败）。
+    """
+    from fastapi import HTTPException
+
+    from webui.api.settings import SettingPatch, patch_setting
+
+    rt = _FakeRt(_config_with_vision())
+    with pytest.raises(HTTPException) as excinfo:
+        await patch_setting(
+            _patch_request(rt),
+            SettingPatch(path="features.vision.provider", value=""),
+        )
+    assert excinfo.value.status_code == 400
+    assert "vision" in str(excinfo.value.detail)
+    # 关键：内存里的值必须一个都没变，否则下一次落盘就把坏配置写进磁盘
+    assert rt.config.features.vision.provider == "deepseek_main"
+    assert rt.config.features.vision.enabled is True
+
+
+async def test_valid_patch_is_committed():
+    """合法改动要真的落进 rt.config（关掉 vision 后再清 provider 是允许的顺序）。"""
+    from webui.api.settings import SettingPatch, patch_setting
+
+    rt = _FakeRt(_config_with_vision())
+    request = _patch_request(rt)
+    await patch_setting(request, SettingPatch(path="features.vision.enabled", value=False))
+    await patch_setting(request, SettingPatch(path="features.vision.provider", value=""))
+    assert rt.config.features.vision.enabled is False
+    assert rt.config.features.vision.provider == ""

@@ -538,7 +538,10 @@ class MessagePipeline(
 
             # Phase 0 后发送类工具已在工具调用内即时发送；这里仅保留兼容兜底。
             await self._execute_collected(ctx.collected)
-            self._calibrate_tokens(estimated_prompt_tokens, result.prompt_tokens)
+            # 必须用 first_prompt_tokens：estimated_prompt_tokens 是预检时对**单次**
+            # 请求的估算，而 result.prompt_tokens 是工具循环的累加值（可能是它的
+            # 2~3 倍），两者口径不同，拿累加值校准会把系数推向 >1 的错误方向。
+            self._calibrate_tokens(estimated_prompt_tokens, result.first_prompt_tokens)
             self.mark_activity()
             self._schedule_persona_after_turn(
                 conversation_id=conversation_id,

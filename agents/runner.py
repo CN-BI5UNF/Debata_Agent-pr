@@ -43,6 +43,7 @@ from .base import (
     ToolExecutor,
     UsageRecorder,
 )
+from .context_builder import first_tail_block_index
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,10 @@ class AgentRunner:
         loop_count = 0
         no_tool_retry_count = 0
         prompt_tokens_total = 0
+        # 只记第一次调用的 prompt_tokens：它才是与上下文预检估算口径一致的那个
+        # prompt。后续工具循环会把工具结果不断追加进来，累加值远大于预检估算，
+        # 拿累加值做校准会把 ratio 推向 >1，反而让估算越来越离谱。
+        first_prompt_tokens = 0
         refocus_interval = self.cfg.refocus_interval
         reminder_interval = max(1, int(self.cfg.tool_loop_reminder_interval))
         final_warning_count = max(1, int(self.cfg.tool_loop_final_warning_count))
@@ -239,6 +244,7 @@ class AgentRunner:
                     finish_reason="api_error",
                     reasoning_logs=reasoning_logs,
                     prompt_tokens=prompt_tokens_total,
+                    first_prompt_tokens=first_prompt_tokens,
                 )
             except ProviderError as e:
                 logger.error(f"AgentRunner API 错误（轮次 {loop_count}）: {e}")
@@ -256,6 +262,7 @@ class AgentRunner:
                     finish_reason="api_error",
                     reasoning_logs=reasoning_logs,
                     prompt_tokens=prompt_tokens_total,
+                    first_prompt_tokens=first_prompt_tokens,
                 )
             except Exception as e:
                 logger.exception(f"AgentRunner 未知错误（轮次 {loop_count}）: {e}")
@@ -273,8 +280,11 @@ class AgentRunner:
                     finish_reason="api_error",
                     reasoning_logs=reasoning_logs,
                     prompt_tokens=prompt_tokens_total,
+                    first_prompt_tokens=first_prompt_tokens,
                 )
 
+            if first_prompt_tokens <= 0:
+                first_prompt_tokens = int(result.usage.prompt_tokens or 0)
             prompt_tokens_total += result.usage.prompt_tokens
             await self._record_usage(
                 usage_recorder,
@@ -472,6 +482,7 @@ class AgentRunner:
             finish_reason=finish_reason,
             reasoning_logs=reasoning_logs,
             prompt_tokens=prompt_tokens_total,
+            first_prompt_tokens=first_prompt_tokens,
         )
 
     # ============================================================
@@ -1002,6 +1013,17 @@ def _kv_prompt_diagnostics(
         default=str,
     )
     tool_schema_modes = _tool_schema_mode_counts(tools or [])
+    # 稳定前缀 = system + 工具集 + append-only 历史。它是前缀缓存唯一能命中的部分：
+    # 只要 kv_prefix_stable_hash 跨请求不变，命中量就该随历史增长而增长；它一跳变，
+    # 命中就会塌回 system 大小（历史上反复出现的 11008 现象）。
+    tail_start = first_tail_block_index(normalized)
+    stable_text = json.dumps(
+        normalized[:tail_start],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
     diag: dict[str, Any] = {
         "kv_loop": int(loop),
         "kv_message_count": len(normalized),
@@ -1024,6 +1046,14 @@ def _kv_prompt_diagnostics(
         "kv_prefix_8k_hash": _short_hash(serialized[:8192]),
         "kv_prefix_16k_hash": _short_hash(serialized[:16384]),
         "kv_prefix_24k_hash": _short_hash(serialized[:24576]),
+        # 骨架就有约 20K 字符，24K 上限刚好落在「病灶区」之前看不到问题，故加档
+        "kv_prefix_32k_hash": _short_hash(serialized[:32768]),
+        "kv_prefix_48k_hash": _short_hash(serialized[:49152]),
+        # 可复用前缀（system + 历史），尾块之前的全部内容
+        "kv_prefix_stable_hash": _short_hash(stable_text),
+        "kv_prefix_stable_char_count": len(stable_text),
+        "kv_tail_block_count": len(normalized) - tail_start,
+        "kv_tail_char_count": len(serialized) - len(stable_text),
         "kv_has_send_receipt": "<send_receipt" in joined_content,
         "kv_send_receipt_block_count": joined_content.count("<send_receipt"),
         "kv_send_receipt_char_count": _tagged_block_char_count(

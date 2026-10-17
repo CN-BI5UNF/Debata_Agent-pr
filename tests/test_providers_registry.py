@@ -124,7 +124,7 @@ def test_preset_still_injects_thinking_field(builtin_presets, secrets):
     provider = build_provider("ds", cfg, secrets, builtin_presets)
     assert provider.reasoning_style == "thinking_extra_body"
     assert provider._build_reasoning_extra_body(
-        ReasoningConfig(enabled=False), model="deepseek-v4-flash"
+        ReasoningConfig(enabled=False), model="deepseek-flash"
     ) == {"thinking": {"type": "disabled"}}
 
 
@@ -139,7 +139,7 @@ def test_config_reasoning_style_overrides_preset(builtin_presets, secrets):
     provider = build_provider("relay", cfg, secrets, builtin_presets)
     assert provider.reasoning_style == "none"
     # known_model_ids 仍来自 preset（base_url 是覆盖，不是抛弃 preset）
-    assert "deepseek-v4-flash" in provider.known_model_ids
+    assert "deepseek-flash" in provider.known_model_ids
 
 
 def test_config_reasoning_style_rejects_unknown_value():

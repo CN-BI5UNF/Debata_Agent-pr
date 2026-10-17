@@ -282,3 +282,30 @@ def test_missing_key_leaves_api_key_id_empty(host):
         chat={"provider": "p1", "model": "deepseek-v4-flash"},
     ))
     assert _read(host).providers["p1"].api_key_id is None
+
+
+# ============================================================
+# 落盘前的兜底校验
+# ============================================================
+
+
+def test_save_config_refuses_invalid_config(host):
+    """内存配置不合法时拒绝落盘。
+
+    这是最后一道闸：某个接口漏校验把内存改坏时，宁可这次保存失败，
+    也不能写出一份 Runtime 下次启动直接起不来的配置。
+    """
+    from types import SimpleNamespace
+
+    from app_config import ConfigError
+
+    host.write_initial_config(_payload())
+    cfg = _read(host)
+    cfg.features.vision.enabled = True  # 直接赋值绕过校验，模拟内存被改坏
+    cfg.features.vision.provider = ""
+    host.rt = SimpleNamespace(config=cfg, paths=host.build_paths())
+
+    before = host.config_file_path.read_text(encoding="utf-8")
+    with pytest.raises(ConfigError, match="拒绝写入"):
+        host.save_config()
+    assert host.config_file_path.read_text(encoding="utf-8") == before

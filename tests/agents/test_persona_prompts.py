@@ -464,33 +464,37 @@ def test_build_combined_system_prompt_propagates_physiology_tools():
     assert "duration_minutes 填 1-720 分钟" in sys
 
 
-def test_build_combined_system_prompt_rag_mode_keeps_important_memory():
+def test_build_combined_system_prompt_rag_mode_uses_retrieval_note():
     p = _persona()
-    sys = build_combined_system_prompt(p, important_memory_text="历史片段", memory_mode="rag")
+    sys = build_combined_system_prompt(p, memory_mode="rag")
     assert "RAG 会话向量检索" in sys
     assert "<retrieved_conversation_context" in sys
     assert "</retrieved_conversation_context>" not in sys
-    assert "历史片段" in sys
-    assert "<long_term_memory" in sys
     assert "save_important_memory" in sys
     assert "update_important_memory" in sys
     assert "没有 save_important_memory" not in sys
     assert "不能指望 RAG 一定召回" in sys
 
 
-def test_build_combined_system_prompt_with_important_memory():
+def test_build_combined_system_prompt_never_contains_memory_block():
+    """重要记忆按会话 scope 过滤，放进 system 会让其后整段历史的前缀缓存失效。
+
+    它必须由 `build_runtime_tail_blocks` 追加到历史之后，绝不进 system。
+    """
     p = _persona()
-    sys = build_combined_system_prompt(
-        p, important_memory_text="[重要记忆]\n- 张三是朋友"
-    )
-    assert "<long_term_memory" in sys
-    assert "张三是朋友" in sys
+    for mode in ("file", "rag"):
+        sys = build_combined_system_prompt(p, memory_mode=mode)
+        assert "<long_term_memory" not in sys
+        assert "<rolling_conversation_summary" not in sys
+        assert "张三是朋友" not in sys
 
 
-def test_build_combined_system_prompt_without_memory_skips_tag():
+def test_build_combined_system_prompt_is_constant_for_same_inputs():
+    """同样的 (persona, memory_mode, 工具开关) 必须产出逐字节相同的 system。"""
     p = _persona()
-    sys = build_combined_system_prompt(p, important_memory_text="")
-    assert "<long_term_memory" not in sys
+    first = build_combined_system_prompt(p, memory_mode="file")
+    second = build_combined_system_prompt(p, memory_mode="file")
+    assert first == second
 
 
 def test_build_admin_info_empty():

@@ -57,7 +57,9 @@ class PipelineWorkingContextMixin:
         estimator = self._token_estimator()
         estimator.update_calibration(estimated, actual_prompt_tokens)
         self._token_calib_ratio = estimator.calib_ratio
-        logger.debug(
+        # 用 info：这个系数直接决定上下文预算与压缩时机，藏在 debug 里会让
+        # "估算高估 2 倍导致压缩风暴" 这类故障变得不可观测。
+        logger.info(
             "token 估算校准：estimated=%s actual=%s ratio=%.3f",
             estimated,
             actual_prompt_tokens,

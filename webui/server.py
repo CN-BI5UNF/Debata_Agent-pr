@@ -84,6 +84,7 @@ def create_app(host: RuntimeHost, auth: TokenAuth) -> FastAPI:
     for router in ALL_ROUTERS:
         app.include_router(router)
 
+    _install_config_error_handler(app)
     _install_auth_middleware(app, auth)
     _install_routes(app)
     return app
@@ -97,6 +98,20 @@ async def _boot(host: RuntimeHost, hub: EventHub) -> None:
             hub.attach_timeline()
     except Exception:  # noqa: BLE001
         logger.exception("Runtime 后台启动失败")
+
+
+def _install_config_error_handler(app: FastAPI) -> None:
+    """配置写入被拒 → 400 带原文，而不是 500「Internal Server Error」。
+
+    ``RuntimeHost.save_config`` 落盘前会校验，失败抛 ``ConfigError``；
+    前端要把这段话原样弹给用户（说的是哪个字段不合法、该怎么改）。
+    """
+    from app_config import ConfigError
+
+    @app.exception_handler(ConfigError)
+    async def _handle(request: Request, exc: ConfigError) -> JSONResponse:
+        logger.warning("配置操作被拒绝 %s: %s", request.url.path, exc)
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 def _install_auth_middleware(app: FastAPI, auth: TokenAuth) -> None:

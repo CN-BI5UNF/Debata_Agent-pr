@@ -296,7 +296,7 @@ class AgentConfig(StrictModel):
     """provider ID（必须在顶层 providers 字典中存在）"""
 
     model: str
-    """模型 ID，如 'deepseek-v4-flash'、'claude-sonnet-4-5'、'glm-4.7-flash'"""
+    """模型 ID，如 'deepseek-flash'、'deepseek-v4-pro'、'claude-sonnet-4-5'、'glm-4.7-flash'"""
 
     temperature: float = Field(default=0.6, ge=0.0, le=2.0)
     """采样温度。聊天主体推荐 0.6；总结/路由用 0.1~0.3。"""
@@ -618,6 +618,29 @@ class PersonaManagementPersonaAgentConfig(PersonaManagementAgentConfig):
 
     min_interval_seconds: int = Field(default=300, ge=0)
     """两次人格档案维护之间的最小间隔（秒）。"""
+
+    effect_max_per_type: int = Field(default=10, ge=0)
+    """每种 effect_type 最多保留多少条短期影响；0 = 不限制。
+
+    短期影响由模型每轮自行生成，若不封顶会无界增长（实测 69 条、约
+    1 条/2.6 分钟、每条存活十几小时）。除了让角色被陈旧情绪淹没，它还会
+    让人格维护 prompt 每轮全量回灌几十 K 字符并持续打断前缀缓存。
+    超限时保留最新的若干条，其余从存储中移除。"""
+
+    cue_max_per_conversation: int = Field(default=10, ge=0)
+    """每个会话最多保留多少条线索；0 = 不限制。
+
+    线索同样由模型每轮生成且无界增长（实测 143 条、单群 91 条、一小时新建
+    58 条），是人格维护 prompt 里最大的一段（约 25K 字符），也是打断前缀缓存
+    的主因。线索天然按会话划分，所以按 conversation_id 分别封顶，避免话多的
+    群把其它会话的线索挤掉。超限时保留最新的若干条，其余从存储中移除。"""
+
+    cue_max_total: int = Field(default=20, ge=0)
+    """线索全局最多保留多少条；0 = 不限制。
+
+    只有每会话上限是不够的：低频会话（如私聊）永远不超限，于是 19 小时前的
+    待接续意图会无限期留在 prompt 里。这一层按全局新旧淘汰，保证「线索」真的
+    只反映近期。两步都保留最新的若干条。"""
 
 
 class PersonaManagementSocialAgentConfig(PersonaManagementAgentConfig):

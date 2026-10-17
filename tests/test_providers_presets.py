@@ -210,7 +210,7 @@ def test_model_capability_defaults_cover_vision_and_embedding():
     )
 
     assert model_supports("volcengine", "doubao-seed-2-0-lite-260428", "vision")
-    assert not model_supports("deepseek", "deepseek-v4-flash", "vision")
+    assert not model_supports("deepseek", "deepseek-flash", "vision")
 
     emb_provider = recommended_provider("embedding")
     assert emb_provider is not None

@@ -28,6 +28,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel, Field, ValidationError
 
 from app_config.schema import ProviderConfig, RootConfig
+from webui.config_edit import apply_validated
 
 logger = logging.getLogger(__name__)
 
@@ -104,22 +105,12 @@ def key_id_for(provider_id: str) -> str:
     return f"{provider_id}_key"
 
 
-def _validate_root(cfg: RootConfig) -> None:
-    """跑一遍完整校验，主要为了触发 validate_references()。"""
-    try:
-        RootConfig.model_validate(cfg.model_dump())
-    except ValidationError as e:
-        raise ProviderAdminError(f"配置校验未通过：{e}") from e
-
-
 def _rollback_on_failure(cfg: RootConfig, mutate) -> None:
     """在深拷贝上改，校验通过才写回原对象。"""
-    draft = cfg.model_copy(deep=True)
-    mutate(draft)
-    _validate_root(draft)
-    # 校验通过：把改动搬回原对象（保持调用方持有的引用不变）
-    for field_name in type(cfg).model_fields:
-        setattr(cfg, field_name, getattr(draft, field_name))
+    try:
+        apply_validated(cfg, mutate)
+    except ValidationError as e:
+        raise ProviderAdminError(f"配置校验未通过：{e}") from e
 
 
 # ============================================================
