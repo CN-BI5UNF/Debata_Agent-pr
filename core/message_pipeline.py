@@ -208,6 +208,7 @@ class MessagePipeline(
         persona_agent: Any = None,
         subconscious_agent: Any = None,
         persona_db: Any = None,
+        token_calibration: Any = None,
         eat_tool: bool = False,
         sleep_tool: bool = False,
     ) -> None:
@@ -258,7 +259,26 @@ class MessagePipeline(
         # 退出 _batch_loop 后的兜底 task；保留引用避免 GC
         self._requeue_task: asyncio.Task | None = None
         self._summary_task: asyncio.Task | None = None
-        self._token_calib_ratio = 1.0
+        self.token_calibration = token_calibration
+        self._token_calib_provider = str(
+            getattr(getattr(chat_agent, "provider", None), "name", "") or ""
+        )
+        self._token_calib_model = str(
+            getattr(getattr(chat_agent, "cfg", None), "model", "") or ""
+        )
+        if token_calibration is not None:
+            initial_calibration = token_calibration.get(
+                self._token_calib_provider,
+                self._token_calib_model,
+            )
+            self._token_calib_ratio = initial_calibration.ratio
+            self._token_calib_samples = initial_calibration.samples
+            self._token_calib_mape = initial_calibration.mape
+        else:
+            self._token_calib_ratio = 1.0
+            self._token_calib_samples = 0
+            self._token_calib_mape = 0.0
+        self._fixed_prompt_overhead_cache: int | None = None
         self.last_activity_at = time.monotonic()
         self._inbound_seq = 0
         self._send_manager = _AsyncSendManager(self)
@@ -513,6 +533,14 @@ class MessagePipeline(
                         conversation_id
                     ),
                     runtime_event_callback=self._runtime_event_callback(conversation_id),
+                    estimated_prompt_tokens=estimated_prompt_tokens,
+                    calib_ratio=self._token_calib_ratio,
+                    auto_finish_after_send=bool(
+                        getattr(self.behavior_cfg, "auto_finish_after_send", True)
+                    ),
+                    kv_diagnostics_mode=str(
+                        getattr(self.behavior_cfg, "kv_prompt_diagnostics", "summary")
+                    ),
                 )
             finally:
                 self._send_manager.end_model_turn(conversation_id)

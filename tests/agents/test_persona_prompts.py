@@ -115,58 +115,35 @@ def test_tool_trigger_policy_in_protocol():
     assert "commit_send_attempt" in s
 
 
-def test_tool_use_protocol_documents_runtime_contracts_without_legacy_terms():
+def test_tool_use_protocol_documents_compact_runtime_contract():
     s = build_tool_use_protocol("rag")
     lower = s.lower()
 
-    assert "finish_after_success" in s
+    # 通用 finish_after_success 已由“发送成功自动收尾”替代。
+    assert "finish_after_success" not in s
+    assert "发送成功后系统默认结束本轮" in s
     assert "no_action 是唯一显式沉默终止工具" in s
     assert "needs_review_again 仍属于同一个 send_attempt_id" in s
-    assert "atomic 和 send_* 的 ignore_review_interrupts 都不会绕过发送前 needs_review / needs_review_again" in s
-    assert "send_* 的 ignore_review_interrupts=true 只用于发送被系统接受后的打断处理" in s
-    assert "不能绕过撤回、禁言、无权限、退群、发送失败等硬错误" in s
-    assert "复核后重新调用发送工具改写新消息时，先复核新消息" in s
-    assert "commit_send_attempt 的 ignore_review_interrupts 保持旧 attempt 复核语义" in s
-    assert "复核旧回复是否会脱离上下文" in s
-    assert "私聊/群聊都不要机械每条引用" in s
-    assert "普通顺序闲聊、紧邻上一条且无歧义时自然回复即可" in s
-    assert "延迟回复、吃饭睡觉后接旧话、主动思考接旧话" in s
-    assert "回复非最新消息、多人连续插话、回答被引用的消息" in s
-    assert "没有可靠消息 ID 时不要伪造" in s
-    assert '"行/OK/可以/知道了/不要"这类简短确认' in s
-    assert "只要可能不清楚回谁，就引用、@、点名或自然语言锚定" in s
-    assert "私聊里隔了一段时间才接旧话" in s
+    assert "accepted=true / status=accepted" in s
+    assert "reviewed_until_seq" in s
+    assert "不要原样重发" in s
+    assert "commit_send_attempt" in s
+    assert "reply_to_message_id" in s
+    assert "没有可靠 ID 时" in s
     assert "中文约 1.5 字/秒" in s
-    assert "每条 target 都必须填写 delay" in s
-    assert "本条发出后到下一条发出前的等待秒数" in s
-    assert "第 i 条 delay 按第 i+1 条即将发送的可见内容估算" in s
-    assert "非最后一条通常不要低于 2 秒" in s
-    assert "转折、补充、犹豫或长内容加 2-5 秒" in s
-    assert "表情包和图片按约 1.5-3 秒" in s
-    assert "单条消息只发一条时 delay=0 合法" in s
+    assert "每条都要 delay" in s
     assert "最后一条填 0" in s
-    assert "多条消息不要贴脸连发" in s
+    assert "高级参数" in s
+    assert "tool_search detail=full" in s
     assert "系统自动估算" not in s
     assert "系统校正" not in s
     assert "自动估算" not in s
     assert "系统会按人类输入速度校正" not in s
-    assert '"delay": 0.6' not in s
-    assert '"delay": 0.8' not in s
-    assert '"delay": 0.5' not in s
-    assert '"delay": 1.2' not in s
-    assert '"delay": 2.0' not in s
-    assert '"delay": 2.8' not in s
-    assert '"content": "早啊", "order": 1, "delay": 4.5' in s
-    assert '"content": "今天冷死了", "order": 2, "delay": 3.0' in s
-    assert '"content": "多穿点", "order": 3, "delay": 0' in s
-    assert '"content": "嗯", "order": 1, "delay": 0' in s
-    assert '"content": "明天三点", "order": 1, "delay": 4.5' in s
-    assert '"content": "不是四点", "order": 2, "delay": 0' in s
-    assert "ignore_review_interrupts 只用于 commit_send_attempt" not in s
-    assert "复核后重新调用发送工具改写新内容，必要时传 true 只绕过软复核" not in s
+    assert "早啊" in s
+    assert "今天冷死了" in s
+    assert "多穿点" in s
     assert "update_important_memory" in s
     assert "运行时噪声" in s
-    assert "tool_search 查询完整参数" in s
     assert "status=need_tool_search" in s
     assert "loop_reminder" in s
     assert "<tool_loop_final_warning>" in s
@@ -195,11 +172,11 @@ def test_tool_use_protocol_documents_tool_result_json_contract():
     s = build_tool_use_protocol("file")
 
     assert "role=tool.content 的 JSON 字符串" in s
-    assert "优先看 ok/status/brief/next" in s
+    assert "ok/status/brief/next" in s
     assert "data/results/content/artifact 是工具数据" in s
     assert "recall_history 的 content" in s
     assert "不得把 brief/next/status/content 原样发给 QQ" in s
-    assert "sent[].content 是已经发送过的消息正文" in s
+    assert "sent[].content 只是发送记录" in s
 
 
 @pytest.mark.asyncio

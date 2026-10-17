@@ -131,9 +131,14 @@ export async function render(container, ctx) {
       return;
     }
     const hit = Number(usage.cache_hit_rate || 0);
+    const estimateSamples = Number(usage.estimate_samples || 0);
+    const estimateError = Number(usage.estimate_error_rate || 0);
+    const estimateText = estimateSamples > 0
+      ? `${(estimateError * 100).toFixed(1)}%`
+      : '—';
     fill(usageCard,
       h('h2', { class: 'card-title' }, '用量统计'),
-      h('p', { class: 'card-sub' }, 'Token 消耗与缓存命中情况。'),
+      h('p', { class: 'card-sub' }, 'Token 消耗、缓存命中与估算准确性。'),
       rangeBar,
       h('div', { class: 'grid grid-4', style: { marginTop: '16px' } },
         statCard('请求数', formatNumber(usage.request_count)),
@@ -143,9 +148,15 @@ export async function render(container, ctx) {
       ),
       h('div', { class: 'grid grid-4', style: { marginTop: '16px' } },
         statCard('输入 token', formatNumber(usage.prompt_tokens)),
-        statCard('推理 token', formatNumber(usage.reasoning_tokens)),
+        statCard('未命中输入 token', formatNumber(usage.uncached_prompt_tokens)),
         statCard('命中缓存 token', formatNumber(usage.cached_tokens)),
         statCard('写入缓存 token', formatNumber(usage.cache_creation_tokens)),
+      ),
+      h('div', { class: 'grid grid-4', style: { marginTop: '16px' } },
+        statCard('推理 token', formatNumber(usage.reasoning_tokens)),
+        statCard('估算误差', estimateText),
+        statCard('估算样本', formatNumber(estimateSamples)),
+        statCard('估算输入 token', formatNumber(usage.estimated_prompt_tokens)),
       ),
     );
   }

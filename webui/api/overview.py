@@ -74,6 +74,12 @@ def _usage_dict(rt: Any, range_name: str) -> dict[str, Any]:
         "cache_creation_tokens",
         "total_tokens",
         "cache_hit_rate",
+        "uncached_prompt_tokens",
+        "estimated_prompt_tokens",
+        "estimate_actual_prompt_tokens",
+        "estimate_abs_error_tokens",
+        "estimate_samples",
+        "estimate_error_rate",
     ):
         data[key] = getattr(summary, key, 0)
     return data

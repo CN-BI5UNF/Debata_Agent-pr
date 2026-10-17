@@ -36,7 +36,7 @@ def _save_memory(step: int) -> CompletionResult:
 def _prefix_len(prev: list[dict], nxt: list[dict]) -> int:
     """两个 messages 序列从头开始逐条相同的条数。"""
     count = 0
-    for a, b in zip(prev, nxt):
+    for a, b in zip(prev, nxt, strict=False):
         if a != b:
             break
         count += 1

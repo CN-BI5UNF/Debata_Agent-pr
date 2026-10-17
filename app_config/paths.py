@@ -82,6 +82,7 @@ class AppPaths:
 
         self.MEMORY_DIR: Path = self.DATA_DIR / "memory"
         self.VECTOR_DIR: Path = self.DATA_DIR / "vector"
+        self.TOKEN_CALIBRATION_FILE: Path = self.DATA_DIR / "token_calibration.json"
         self.LOGS_DIR: Path = self.DATA_DIR / "logs"
         self.EMOJI_DIR: Path = self.DATA_DIR / "emoji"
         self.MODELS_DIR: Path = self.DATA_DIR / "models"

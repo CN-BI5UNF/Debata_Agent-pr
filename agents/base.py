@@ -18,6 +18,7 @@ RuntimeEventCallback = Callable[[dict[str, Any]], Awaitable[None]]
 FinishReason = Literal[
     "no_action",
     "finish_after_success",
+    "finish_after_send",
     "tool_stop",
     "no_tool_after_retry",
     "tool_loop_finalized",

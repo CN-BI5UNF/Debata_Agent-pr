@@ -5,9 +5,9 @@ from __future__ import annotations
 import inspect
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, fields, is_dataclass, replace
 from datetime import datetime
-from collections.abc import Callable
 from typing import Any
 
 from mind import Cue, Effect, PersonaState, Todo, UserProfile, clamp_percent

@@ -1006,13 +1006,13 @@ class SummarizeConfig(StrictModel):
     target_after_tokens: int | None = None
     """滚动摘要后活跃窗口目标 token。显式配置优先于百分比推导。"""
 
-    trigger_at_context_percent: int = Field(default=75, ge=50, le=100)
+    trigger_at_context_percent: int = Field(default=50, ge=5, le=100)
     """未显式配置 trigger_at_tokens 时，按工作上下文预算此百分比推导滚动摘要触发阈值。"""
 
-    target_after_context_percent: int = Field(default=50, ge=50, le=100)
+    target_after_context_percent: int = Field(default=30, ge=5, le=100)
     """未显式配置 target_after_tokens 时，按工作上下文预算此百分比推导活跃窗口目标。"""
 
-    retry_target_after_context_percent: int = Field(default=30, ge=5, le=100)
+    retry_target_after_context_percent: int = Field(default=20, ge=5, le=100)
     """第一次压缩后仍超预算或压缩失败时，重试压缩使用的活跃窗口目标百分比。"""
 
     @model_validator(mode="before")
@@ -1142,11 +1142,39 @@ def default_tool_result_budgets() -> dict[str, ToolResultBudgetConfig]:
     }
 
 
+class ModelViewConfig(StrictModel):
+    """给模型看的历史视图裁剪策略（只影响 prompt，不删除落盘历史）。"""
+
+    enabled: bool = True
+    """关闭后恢复完整 active history。"""
+
+    task_context_keep: int = Field(default=2, ge=0, le=100)
+    """模型可见的最近 task_context 快照数量。"""
+
+    send_receipt_keep: int = Field(default=2, ge=0, le=100)
+    """模型可见的最近 send_receipt 数量。"""
+
+    send_status_keep: int = Field(default=2, ge=0, le=100)
+    """模型可见的最近 send_done / send_status 快照数量。"""
+
+    no_action_keep: int = Field(default=4, ge=0, le=200)
+    """模型可见的最近 no_action 调用组数量。"""
+
+    max_record_chars: int = Field(default=8000, ge=512)
+    """单条 user 记录进入模型视图的最大字符数；超出做头尾截断。"""
+
+    project_tool_results: bool = True
+    """是否把发送类工具结果投影成精简字段。"""
+
+
 class ContextConfig(StrictModel):
     """上下文预算配置。max_context_tokens 是工作预算，不是模型硬上限。"""
 
     max_context_tokens: int | None = None
     """None = 根据当前模型预设 context_length 推导工作预算。"""
+
+    model_view: ModelViewConfig = Field(default_factory=ModelViewConfig)
+    """给模型看的历史视图裁剪策略。"""
 
     recommended_context_budget: ContextBudgetRecommendationConfig = Field(
         default_factory=ContextBudgetRecommendationConfig
@@ -1241,6 +1269,15 @@ class BehaviorConfig(StrictModel):
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     summarize: SummarizeConfig = Field(default_factory=SummarizeConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
+
+    tool_schema_profile: Literal["compact", "full"] = "compact"
+    """工具 schema 暴露档位：compact=核心字段直出、其余按需 tool_search；full=旧行为。"""
+
+    kv_prompt_diagnostics: Literal["off", "summary", "full"] = "summary"
+    """KV 诊断级别：off 关闭；summary 只做轻量计数；full 保留旧的全量序列化哈希。"""
+
+    auto_finish_after_send: bool = True
+    """发送成功后自动结束本轮工具循环，省掉一次 no_action 收尾调用。"""
 
     @model_validator(mode="before")
     @classmethod

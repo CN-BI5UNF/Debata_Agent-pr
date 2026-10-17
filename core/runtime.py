@@ -432,7 +432,11 @@ class Runtime:
 
         # ----- 11. Pipeline -----
         from .message_pipeline import MessagePipeline
+        from .token_calibration import TokenCalibrationStore
 
+        self.token_calibration = TokenCalibrationStore(
+            self.paths.TOKEN_CALIBRATION_FILE
+        )
         chat_context_length = self._model_context_length(chat_cfg.provider, chat_cfg.model)
         pipeline_kwargs = {
             "adapter": self.adapter,
@@ -461,6 +465,7 @@ class Runtime:
             "tts": self.tts,
             "rag_memory": self.rag_memory,
             "event_store": self.event_store,
+            "token_calibration": self.token_calibration,
         }
         persona_pipeline_kwargs = {
             "persona_agent": self.persona_agent,
