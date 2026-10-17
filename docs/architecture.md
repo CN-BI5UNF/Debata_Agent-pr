@@ -138,6 +138,39 @@ IAdapter.send_text() → 用户收到消息
 
 ---
 
+## 模型视图（运行时噪声裁剪）
+
+`core/model_view.py` 在**不修改落盘历史**的前提下，构造一份只给模型看的视图：
+
+- 真实聊天、非 no_action 的工具调用/结果全部保留。
+- `task_context_snapshot`、`send_receipt`、`send_done_snapshot` 各保留最近 N 个（默认 2/2/2）。
+- `no_action` 按完整 assistant tool_call + tool result 成对保留最近 4 组。
+- 超长 user 记录做确定性头尾截断（默认 8,000 字符），原始记录仍在 event store/archive 中。
+- 发送类工具结果投影为 `msg_id/order/status` 等定位字段，不再回显已发送正文。
+
+`PipelineWorkingContextMixin._select_working_history()` 返回视图；`_active_history_records()`
+仍返回原始记录，供摘要、归档、`recall_history` 和 `get_recent_chat_messages` 使用。
+压缩触发与目标统一按“视图 token + 固定 system/tools 开销”计算，避免旧快照触发压缩或
+总结 Agent 重复读取噪声。
+
+配置位于 `behavior.context.model_view`，回滚开关是 `enabled=false`。
+
+## Token 计量
+
+- `utils.token_budget.TokenEstimator` 用规范 JSON 估算 messages 与 tools（不再用 Python repr）。
+- 小文本按 `(model, text)` LRU 缓存；工具 schema 按 registry 列表对象缓存。
+- 每次真实调用记录 `estimated_prompt_tokens`、`prompt_estimate_ratio`、`calib_ratio`。
+- `core/token_calibration.py` 按 `provider|model` 持久化校准系数与 MAPE，启动时恢复。
+- 用量面板展示未命中输入 token 与估算误差；`cached_tokens` 会被 clamp 到 `prompt_tokens`。
+
+## 工具 schema 档位
+
+- `behavior.tool_schema_profile="compact"`（默认）：11 个高频工具直出核心字段；
+  其余工具为 stub，需先 `tool_search`；高级可选字段通过 `tool_search detail=full` 查看。
+- `"full"`：保留旧的 31 个 full schema 行为，用于回滚/排查。
+- `finish_after_success` 已从 schema 移除；执行层兼容旧调用。发送成功后
+  `behavior.auto_finish_after_send=true` 会直接结束本轮，避免额外一次 `no_action` 调用。
+
 ## 工具结果创建即定型
 
 工具结果只在刚返回时做一次精简，写入 `history` 后不再回改。这样旧 `tool` record 的字节稳定，避免为了清理长结果而破坏 KV 缓存前缀。

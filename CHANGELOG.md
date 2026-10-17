@@ -2,6 +2,33 @@
 
 本文件记录 Debata 所有重要变更，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased] — token 效率重构
+
+### Added
+- 新增非破坏性“模型视图”（`core/model_view.py`）：只裁剪发给模型的历史视图，历史/归档/事件库原样保留。默认只保留最近 2 个 `task_context`、2 条发送回执、2 条发送完成快照和 4 组 `no_action`。
+- 新增按 provider/model 持久化的 token 校准（`core/token_calibration.py` + 实例目录 `token_calibration.json`），重启后不再退回 1.0。
+- 新增 `scripts/benchmark_prompt_tokens.py`：只读对比重构前后的活跃历史、系统提示、工具 schema 与估算 prompt。
+- 新增工具 schema `compact` 档位：核心字段直出，高级字段通过 `tool_search detail=full` 查看；默认 11 个 compact + 其余 stub。
+- 新增发送成功后自动收尾（`behavior.auto_finish_after_send`），省掉一次 `no_action` 收尾模型调用。
+- 用量面板新增“未命中输入 token / 估算误差 / 估算样本”。
+
+### Changed
+- 滚动摘要触发/目标默认从 75%/50%/30% 调整为 50%/30%/20%，并按“模型可见视图 + 固定开销”口径计算；128k 工作预算需要在设置页或实例配置中显式设置。
+- KV 诊断默认改为 `summary` 轻量模式，不再每轮对完整消息与工具集做多次全量 JSON 序列化。
+- 工具 schema 移除通用 `finish_after_success` 参数；执行层仍兼容旧调用。
+- 发送类工具结果不再回显已发送正文，只保留 msg_id/order/状态等定位信息。
+- token 估算改用规范 JSON（messages + tools）口径，并为小文本与工具 schema 增加缓存。
+
+### Fixed
+- 修正 `str(tools_schema)` 造成的工具 schema token 估算偏差。
+- 修正 `cached_tokens > prompt_tokens` 等脏数据导致缓存命中率超过 100% 的问题。
+- 避免旧运行时快照触发压缩、以及总结 Agent 重复读取旧快照的问题。
+
+### Measured
+- 真实实例活跃历史：185,173 → 39,956 估算 token（-78.4%）。
+- 工具 schema：full 档位 9,817 → compact 档位 4,740 token。
+- 估算单次主 prompt：206,673 → 56,379（-72.7%）。
+
 ## [v0.9.0-alpha] — 2026-07-04
 
 ### Added
