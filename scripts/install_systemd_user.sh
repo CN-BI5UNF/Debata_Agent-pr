@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# 安装 Debata Agent 的 systemd 用户服务（无需 sudo）。
+#
+# 用法：
+#   bash scripts/install_systemd_user.sh
+#   bash scripts/install_systemd_user.sh --headless          # 不启动 WebUI
+#   bash scripts/install_systemd_user.sh --host 127.0.0.1 --port 9000
+#   bash scripts/install_systemd_user.sh --no-auth           # 仅完全可信内网
+#   bash scripts/install_systemd_user.sh --dry-run           # 只打印 unit
+#
+# 卸载：
+#   systemctl --user disable --now debata-agent
+#   rm -f ~/.config/systemd/user/debata-agent.service
+#   systemctl --user daemon-reload
+
+set -euo pipefail
+
+SERVICE_NAME="debata-agent"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+TARGET_UNIT_FILE="$UNIT_DIR/$SERVICE_NAME.service"
+UNIT_FILE="$TARGET_UNIT_FILE"
+PYTHON="$PROJECT_ROOT/.venv/bin/python"
+HEADLESS=0
+DRY_RUN=0
+HOST="0.0.0.0"
+PORT="8000"
+EXTRA_ARGS=()
+
+usage() {
+    cat <<'EOF'
+用法: bash scripts/install_systemd_user.sh [选项]
+
+  --headless       只跑 headless Runtime（不启动 WebUI）
+  --host HOST      WebUI 监听地址（默认 0.0.0.0）
+  --port PORT      WebUI 端口（默认 8000）
+  --no-auth        关闭 WebUI 鉴权（仅完全可信内网）
+  --dry-run        只打印生成的 unit，不写入、不启动
+  -h, --help       显示帮助
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --headless)
+            HEADLESS=1
+            shift
+            ;;
+        --host)
+            HOST="${2:-}"
+            shift 2
+            ;;
+        --port)
+            PORT="${2:-}"
+            shift 2
+            ;;
+        --no-auth)
+            EXTRA_ARGS+=("--no-auth")
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "未知参数: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+    echo "端口不合法: $PORT（应为 1-65535）" >&2
+    exit 2
+fi
+
+if [[ ! -f "$PROJECT_ROOT/main.py" ]]; then
+    echo "找不到 $PROJECT_ROOT/main.py，请在 Debata_Agent 项目内运行。" >&2
+    exit 1
+fi
+
+if [[ ! -x "$PYTHON" ]]; then
+    cat >&2 <<EOF
+找不到可执行的 $PYTHON。
+请先安装依赖：
+    cd "$PROJECT_ROOT"
+    uv sync
+EOF
+    exit 1
+fi
+
+if ! command -v systemctl >/dev/null 2>&1; then
+    echo "系统没有 systemctl，无法安装 systemd 服务。" >&2
+    exit 1
+fi
+
+if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    echo "警告：当前以 root 运行。建议用普通用户安装用户服务，或改用系统级模板。" >&2
+fi
+
+EXEC_ARGS=()
+if [[ "$HEADLESS" -eq 1 ]]; then
+    EXEC_ARGS+=("--no-gui")
+else
+    EXEC_ARGS+=("--host" "$HOST" "--port" "$PORT")
+fi
+EXEC_ARGS+=("${EXTRA_ARGS[@]}")
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    UNIT_FILE="$(mktemp)"
+else
+    mkdir -p "$UNIT_DIR"
+fi
+QUOTED_EXTRA=""
+for arg in "${EXEC_ARGS[@]}"; do
+    QUOTED_EXTRA+=" $(printf '%q' "$arg")"
+done
+
+cat > "$UNIT_FILE" <<EOF
+[Unit]
+Description=Debata Agent ($([[ $HEADLESS -eq 1 ]] && echo "headless" || echo "WebUI + runtime"))
+Documentation=file://$PROJECT_ROOT/docs/background_running.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT
+ExecStart="$PYTHON" "$PROJECT_ROOT/main.py"$QUOTED_EXTRA
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-$HOME/.config/debata-agent.env
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0077
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+EOF
+chmod 0644 "$UNIT_FILE"
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "# 将写入: $TARGET_UNIT_FILE"
+    cat "$UNIT_FILE"
+    rm -f "$UNIT_FILE"
+    exit 0
+fi
+
+echo "已写入: $TARGET_UNIT_FILE"
+systemctl --user daemon-reload
+systemctl --user enable --now "$SERVICE_NAME"
+
+LINGER="$(loginctl show-user "$USER" -p Linger --value 2>/dev/null || true)"
+if [[ "$LINGER" != "yes" ]]; then
+    cat <<EOF
+
+提示：当前没有开启 linger。SSH 注销/重启后服务可能不会继续运行。
+建议执行（需要 sudo）：
+    sudo loginctl enable-linger "$USER"
+EOF
+fi
+
+echo
+systemctl --user --no-pager status "$SERVICE_NAME" || true
+echo
+echo "常用命令："
+echo "  状态    : systemctl --user status $SERVICE_NAME --no-pager"
+echo "  日志    : journalctl --user -u $SERVICE_NAME -f"
+echo "  重启    : systemctl --user restart $SERVICE_NAME"
+echo "  停止    : systemctl --user stop $SERVICE_NAME"
+if [[ "$HEADLESS" -eq 0 ]]; then
+    echo "  WebUI   : http://127.0.0.1:$PORT"
+    echo "  令牌文件: ~/.local/share/Debata_Agent/instances/default/webui_token.txt"
+    echo "            （首次启动后生成；也可用 journalctl 查看启动横幅）"
+fi

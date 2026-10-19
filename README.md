@@ -77,6 +77,25 @@ uv run main.py --no-auth            # 关闭鉴权（仅限完全可信内网）
 uv run main.py --no-gui             # 纯命令行，不启动 WebUI
 ```
 
+### 后台运行（systemd / tmux / screen）
+
+长期运行推荐 systemd 用户服务，无需 sudo，崩溃自动重启、开机自启：
+
+```bash
+cd ~/Debata_Agent
+bash scripts/install_systemd_user.sh
+sudo loginctl enable-linger "$USER"   # 注销 SSH 后继续运行
+systemctl --user status debata-agent --no-pager
+journalctl --user -u debata-agent -f
+```
+
+默认同时启动 WebUI 和 QQ Runtime；只跑 headless 加 `--headless`。
+临时挂机可以用 `tmux new -s debata` 或 `screen -S debata`。
+NapCat 是独立进程，需要单独保持运行。
+
+完整说明（系统级服务、nohup、升级、排错、安全建议）见
+[后台运行指南](docs/background_running.md)。
+
 本地 ASR/TTS/Embedding 的重依赖不随默认安装拉取; 打开对应模型的安装指引时，Debata 会检查缺失运行包并在后台用当前 venv 补装.
 
 你也可以使用`uv sync --extra <你要的功能>`来提前安装，这与系统安装的效果相同，模块详见下表
@@ -132,6 +151,7 @@ Debata_Agent/
 - [图文教程](docs/getting_started.md) — 从零开始，截图指引每一步
 - [角色编写指南](docs/persona_writing_guide.md) — 怎么写出会"活"的人格
 - [架构总览](docs/architecture.md) — 模块依赖 + KV 缓存设计
+- [后台运行指南](docs/background_running.md) — systemd / tmux / screen / nohup
 - [KV 缓存基准](docs/kv_cache_benchmark.md) — 真实命中率数据
 - [提供商开发](docs/provider_development.md) — 接新的 LLM
 - [适配器开发](docs/adapter_development.md) — 接新的聊天平台

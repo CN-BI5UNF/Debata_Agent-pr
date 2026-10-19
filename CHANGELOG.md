@@ -11,6 +11,8 @@
 - 新增工具 schema `compact` 档位：核心字段直出，高级字段通过 `tool_search detail=full` 查看；默认 11 个 compact + 其余 stub。
 - 新增发送成功后自动收尾（`behavior.auto_finish_after_send`），省掉一次 `no_action` 收尾模型调用。
 - 用量面板新增“未命中输入 token / 估算误差 / 估算样本”。
+- 新增 [后台运行指南](docs/background_running.md)：systemd 用户/系统级服务、tmux、screen、nohup、升级与排错。
+- 新增 `scripts/install_systemd_user.sh` 一键安装脚本和 `scripts/systemd/` 单元模板。
 
 ### Changed
 - 滚动摘要触发/目标默认从 75%/50%/30% 调整为 50%/30%/20%，并按“模型可见视图 + 固定开销”口径计算；128k 工作预算需要在设置页或实例配置中显式设置。

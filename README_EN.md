@@ -122,20 +122,42 @@ Debata_Agent/
 └── main.py          Entry point
 ```
 
-systemd service example (`/etc/systemd/system/debata.service`):
+### Run in the background
+
+Long-running deployments should use a systemd user service (no sudo):
+
+```bash
+cd ~/Debata_Agent
+bash scripts/install_systemd_user.sh
+sudo loginctl enable-linger "$USER"   # keep running after logout
+systemctl --user status debata-agent --no-pager
+journalctl --user -u debata-agent -f
+```
+
+Use `--headless` to run without the WebUI. For temporary sessions, use
+`tmux new -s debata` or `screen -S debata`. NapCat must be kept running
+separately.
+
+System-level template: `scripts/systemd/debata-agent.system.service`.
+Full guide (Chinese): [docs/background_running.md](docs/background_running.md).
+
+Minimal system-level unit:
 
 ```ini
 [Unit]
 Description=Debata Agent
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=debata
 WorkingDirectory=/opt/Debata_Agent
-ExecStart=/opt/Debata_Agent/venv/bin/python main.py --no-gui
+ExecStart=/opt/Debata_Agent/.venv/bin/python /opt/Debata_Agent/main.py --host 0.0.0.0 --port 8000
+Environment=PYTHONUNBUFFERED=1
 Restart=on-failure
 RestartSec=5
+KillSignal=SIGINT
 
 [Install]
 WantedBy=multi-user.target
@@ -146,6 +168,7 @@ WantedBy=multi-user.target
 - [Getting Started](docs/getting_started.md) — step-by-step with screenshots
 - [Persona Writing Guide](docs/persona_writing_guide.md) — how to write a personality that comes alive
 - [Architecture Overview](docs/architecture.md) — module dependencies and KV cache design
+- [Background Running Guide](docs/background_running.md) — systemd / tmux / screen / nohup
 - [KV Cache Benchmark](docs/kv_cache_benchmark.md) — real-world hit rate data
 - [Adapter Development](docs/adapter_development.md) — adding new chat platforms
 - [Provider Development](docs/provider_development.md) — adding new LLM backends
