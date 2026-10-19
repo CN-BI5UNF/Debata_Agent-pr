@@ -121,12 +121,19 @@ def _ensure_installed() -> bool:
     return True
 
 
-def _token_path() -> Path:
-    data_root = Path(
+def _data_root() -> Path:
+    return Path(
         os.environ.get("DEBATA_DATA_ROOT")
         or (Path.home() / ".local" / "share" / "Debata_Agent")
     )
-    return data_root / "instances" / "default" / "webui_token.txt"
+
+
+def _token_path() -> Path:
+    return _data_root() / "instances" / "default" / "webui_token.txt"
+
+
+def _app_log_path() -> Path:
+    return _data_root() / "instances" / "default" / "logs" / "debata.log"
 
 
 def cmd_start() -> int:
@@ -168,13 +175,52 @@ def cmd_status() -> int:
     return _run(["systemctl", "--user", "status", SERVICE_NAME, "--no-pager"])
 
 
+def _journal_command() -> list[str] | None:
+    """选择能读到本服务日志的 journalctl 调用方式。
+
+    某些发行版（如部分 Armbian 配置）不保存用户 journal，日志实际写在
+    系统 journal 的 ``_SYSTEMD_USER_UNIT`` 字段里；此时不能只用
+    ``journalctl --user``。
+    """
+    if shutil.which("journalctl") is None:
+        return None
+
+    user_cmd = ["journalctl", "--user", "-u", SERVICE_NAME]
+    probe = subprocess.run(
+        [*user_cmd, "-n", "0", "--no-pager"],
+        capture_output=True,
+        text=True,
+    )
+    if "No journal files were found" not in (probe.stdout + probe.stderr):
+        return [*user_cmd, "-n", "200", "-f"]
+
+    system_cmd = [
+        "journalctl",
+        f"_SYSTEMD_USER_UNIT={SERVICE_NAME}.service",
+    ]
+    probe = subprocess.run(
+        [*system_cmd, "-n", "1", "--no-pager"],
+        capture_output=True,
+        text=True,
+    )
+    output = probe.stdout + probe.stderr
+    if "No journal files were found" not in output and "-- No entries --" not in output:
+        return [*system_cmd, "-n", "200", "-f"]
+    return None
+
+
 def cmd_log() -> int:
     if not _require_unit():
         return 1
-    if shutil.which("journalctl") is None:
-        print("当前系统没有 journalctl。日志见数据目录的 logs/debata.log。")
-        return 1
-    return _run(["journalctl", "--user", "-u", SERVICE_NAME, "-n", "200", "-f"])
+    command = _journal_command()
+    if command is not None:
+        return _run(command)
+    log_file = _app_log_path()
+    if log_file.exists():
+        print(f"journald 中未找到日志，改为查看 {log_file}")
+        return _run(["tail", "-n", "200", "-F", str(log_file)])
+    print(f"当前系统没有可用日志：既没有 journald 记录，也没有 {log_file}")
+    return 1
 
 
 def _enable_linger() -> bool:

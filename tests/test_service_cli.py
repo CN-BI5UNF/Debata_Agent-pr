@@ -76,3 +76,50 @@ def test_disable_only_disables_autostart(monkeypatch, tmp_path):
 
     assert service_cli.main(["disable"]) == 0
     assert calls == [["systemctl", "--user", "disable", "debata-agent"]]
+
+
+def test_log_uses_system_journal_when_user_journal_is_missing(monkeypatch):
+    monkeypatch.setattr(
+        service_cli.shutil, "which", lambda name: f"/usr/bin/{name}"
+    )
+
+    def fake_run(command, **_kwargs):
+        if "--user" in command:
+            return SimpleNamespace(
+                returncode=0,
+                stdout="",
+                stderr="No journal files were found.\n",
+            )
+        return SimpleNamespace(
+            returncode=0,
+            stdout="Oct 20 00:00:00 host python[1]: hello\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(service_cli.subprocess, "run", fake_run)
+
+    command = service_cli._journal_command()
+
+    assert command is not None
+    assert "_SYSTEMD_USER_UNIT=debata-agent.service" in command
+    assert command[-1] == "-f"
+
+
+def test_log_falls_back_to_app_log_file(monkeypatch, tmp_path, capsys):
+    log_file = tmp_path / "debata.log"
+    log_file.write_text("hello\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(service_cli, "UNIT_FILE", tmp_path / "unit")
+    (tmp_path / "unit").write_text("[Unit]\n", encoding="utf-8")
+    monkeypatch.setattr(service_cli, "_journal_command", lambda: None)
+    monkeypatch.setattr(service_cli, "_app_log_path", lambda: log_file)
+    monkeypatch.setattr(
+        service_cli,
+        "_run",
+        lambda command: calls.append(command) or 0,
+    )
+
+    assert service_cli.main(["log"]) == 0
+    assert calls == [["tail", "-n", "200", "-F", str(log_file)]]
+    assert "debata.log" in capsys.readouterr().out

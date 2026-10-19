@@ -261,6 +261,9 @@ def run_webui(
         access_log=False,
         ws_ping_interval=25.0,
         ws_ping_timeout=25.0,
+        # 不设置时 uvicorn 会无限等待 WebSocket 客户端自行断开，
+        # NapCat / 浏览器保持连接时 `debata stop` 会被 systemd 超时强杀。
+        timeout_graceful_shutdown=10,
     )
     server = uvicorn.Server(config)
     app.state.server = server

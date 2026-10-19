@@ -144,7 +144,7 @@ Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-$HOME/.config/debata-agent.env
 Restart=on-failure
 RestartSec=5
-TimeoutStopSec=30
+TimeoutStopSec=60
 KillSignal=SIGINT
 UMask=0077
 NoNewPrivileges=true
