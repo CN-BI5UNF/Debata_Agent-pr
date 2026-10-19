@@ -4,6 +4,16 @@
 和 TRSS-Yunzai 的“后台运行”思路一样：临时挂机可以用 `tmux` / `screen`，
 长期运行推荐交给 `systemd` 管理（自动重启、开机自启、日志集中）。
 
+日常只需要记住这几条：
+
+```bash
+debata start     # 启动
+debata stop      # 停止
+debata log       # 查看日志
+debata enable    # 开机自启
+debata disable   # 取消开机自启
+```
+
 > NapCat 是独立进程，不在本文启动范围内。请先确保 NapCat 已经运行并允许
 > Debata 连接；Debata 断线后会自动重连。
 
@@ -37,56 +47,58 @@ uv run main.py --no-gui --setup
 适合个人设备 / 单用户 Armbian、Ubuntu、Debian。服务以当前用户运行，
 不会用 root 跑机器人。
 
-### 一键安装
+### 一次性安装
 
 ```bash
 cd ~/Debata_Agent
 bash scripts/install_systemd_user.sh
 ```
 
-默认行为：
+安装脚本会写入 systemd unit、安装 `debata` 命令，并启动 WebUI + QQ Runtime。
 
-- 写入 `~/.config/systemd/user/debata-agent.service`
-- 启动 `main.py` 的 **WebUI + QQ Runtime**
-- `Restart=on-failure`，崩溃 5 秒后自动重试
-- 日志进入 journald
-
-只跑 headless（不启动 WebUI）：
+### 日常命令
 
 ```bash
-bash scripts/install_systemd_user.sh --headless
+debata start       # 启动（首次会自动安装服务）
+debata stop        # 停止
+debata log         # 实时查看日志
+debata enable      # 开机自启（并立即启动）
+debata disable     # 取消开机自启（当前进程继续运行）
+debata status      # 运行状态
+debata restart     # 重启
 ```
 
-自定义监听地址/端口：
-
-```bash
-bash scripts/install_systemd_user.sh --host 127.0.0.1 --port 9000
-```
+如果提示 `debata: command not found`，在项目目录用 `./debata start`；
+安装脚本会尝试把命令装到 `~/.local/bin/debata`。
 
 ### 开启 linger（注销后继续运行）
 
-systemd 用户服务默认随登录会话结束而停止。让它在注销/重启后继续运行：
+`debata enable` 会尝试自动开启 linger。如果提示失败，执行：
 
 ```bash
 sudo loginctl enable-linger "$USER"
+loginctl show-user "$USER" -p Linger   # 期望 Linger=yes
 ```
 
-检查：
+### headless / 自定义端口
+
+先运行安装脚本（unit 已存在时 `debata start` 不会覆盖配置）：
 
 ```bash
-loginctl show-user "$USER" -p Linger
-# 期望输出 Linger=yes
+bash scripts/install_systemd_user.sh --headless
+bash scripts/install_systemd_user.sh --host 127.0.0.1 --port 9000
 ```
 
-### 日常管理
+### 等价的 systemctl 命令
+
+`debata` 只是把下面这些命令收起来了；排查时可以直接用：
 
 ```bash
-systemctl --user status debata-agent --no-pager   # 状态
-systemctl --user restart debata-agent             # 重启
-systemctl --user stop debata-agent                # 停止
-systemctl --user enable debata-agent              # 开机自启
-systemctl --user disable --now debata-agent       # 取消自启并停止
-journalctl --user -u debata-agent -f              # 实时日志
+systemctl --user status debata-agent --no-pager
+systemctl --user restart debata-agent
+systemctl --user stop debata-agent
+systemctl --user enable debata-agent
+systemctl --user disable debata-agent
 journalctl --user -u debata-agent -n 200 --no-pager
 ```
 
@@ -258,7 +270,13 @@ tar -czf debata-data-$(date +%Y%m%d).tar.gz \
 ### 服务启动失败 / 203/EXEC
 
 ```bash
-systemctl --user status debata-agent --no-pager
+debata status
+debata log        # 持续输出，Ctrl+C 退出
+```
+
+也可以只看最近 100 行：
+
+```bash
 journalctl --user -u debata-agent -n 100 --no-pager
 ```
 
@@ -296,8 +314,12 @@ bash scripts/install_systemd_user.sh --port 9000
 
 ### 关掉 SSH 后服务停了
 
-没有开启 linger：`sudo loginctl enable-linger "$USER"`。
-也可以在 `loginctl show-user "$USER" -p Linger` 里确认。
+先运行 `debata enable`（会尝试开启 linger）。如果仍然停止，执行：
+
+```bash
+sudo loginctl enable-linger "$USER"
+loginctl show-user "$USER" -p Linger   # 期望 Linger=yes
+```
 
 ### NapCat 没连上
 

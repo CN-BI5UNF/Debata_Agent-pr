@@ -165,24 +165,25 @@ uv run main.py --test-adapter       # 测试 NapCat 连接 5 秒后退出
 
 ## 后台运行
 
-长期运行推荐 **systemd 用户服务**：无需 sudo，崩溃自动重启，支持开机自启。
+一条命令安装并启动，之后用 `debata` 管理：
 
 ```bash
 cd ~/Debata_Agent
-bash scripts/install_systemd_user.sh
-sudo loginctl enable-linger "$USER"     # SSH 注销后继续运行
+bash scripts/install_systemd_user.sh     # 一次性安装并启动
 
-systemctl --user status debata-agent --no-pager
-journalctl --user -u debata-agent -f
+debata start       # 启动（首次会自动安装服务）
+debata stop        # 停止
+debata log         # 实时查看日志
+debata enable      # 开机自启（并立即启动）
+debata disable     # 取消开机自启
+debata status      # 运行状态
+debata restart     # 重启
 ```
 
-- 默认同时启动 WebUI 和 QQ Runtime。
-- 只跑 headless：`bash scripts/install_systemd_user.sh --headless`
-- 自定义端口：`bash scripts/install_systemd_user.sh --port 9000`
-- 先看会生成什么：`bash scripts/install_systemd_user.sh --dry-run`
-
-临时挂机可以用 `tmux new -s debata` 或 `screen -S debata`；最简单的 `nohup` 也写在指南里。
-NapCat 是独立进程，需要单独保持运行。
+- `debata enable` 会尝试开启 linger；如果提示失败，执行 `sudo loginctl enable-linger "$USER"`。
+- 默认同时启动 WebUI 和 QQ Runtime；只跑 headless 用 `bash scripts/install_systemd_user.sh --headless`。
+- 如果 `debata` 不在 PATH，用 `./debata start`。
+- NapCat 是独立进程，需要单独保持运行。
 
 完整说明（系统级服务、tmux / screen / nohup、升级、令牌、排错、安全建议）见
 **[后台运行指南](docs/background_running.md)**。

@@ -13,6 +13,7 @@
 - 用量面板新增“未命中输入 token / 估算误差 / 估算样本”。
 - 新增 [后台运行指南](docs/background_running.md)：systemd 用户/系统级服务、tmux、screen、nohup、升级与排错。
 - 新增 `scripts/install_systemd_user.sh` 一键安装脚本和 `scripts/systemd/` 单元模板。
+- 新增简化服务命令：`debata start` / `stop` / `restart` / `status` / `log` / `enable` / `disable`，底层自动调用 systemd；首次 `debata start` 会自动安装服务。
 
 ### Changed
 - README 中英文重写：补充 Token 效率、后台运行、数据目录、测试与安全说明；clone 地址更新为私有仓库。

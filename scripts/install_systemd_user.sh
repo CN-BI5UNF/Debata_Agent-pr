@@ -23,6 +23,7 @@ UNIT_FILE="$TARGET_UNIT_FILE"
 PYTHON="$PROJECT_ROOT/.venv/bin/python"
 HEADLESS=0
 DRY_RUN=0
+WRITE_ONLY=0
 HOST="0.0.0.0"
 PORT="8000"
 EXTRA_ARGS=()
@@ -36,6 +37,7 @@ usage() {
   --port PORT      WebUI 端口（默认 8000）
   --no-auth        关闭 WebUI 鉴权（仅完全可信内网）
   --dry-run        只打印生成的 unit，不写入、不启动
+  --write-only     写入 unit 和 debata 命令，但不启动服务
   -h, --help       显示帮助
 EOF
 }
@@ -60,6 +62,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dry-run)
             DRY_RUN=1
+            shift
+            ;;
+        --write-only)
+            WRITE_ONLY=1
             shift
             ;;
         -h|--help)
@@ -158,7 +164,34 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 echo "已写入: $TARGET_UNIT_FILE"
+
+# 安装 debata 管理命令（不覆盖已有的非 Debata 命令）
+BIN_DIR="$HOME/.local/bin"
+LAUNCHER="$BIN_DIR/debata"
+if [[ -e "$LAUNCHER" ]] && ! grep -q "Debata Agent launcher" "$LAUNCHER" 2>/dev/null; then
+    echo "提示：$LAUNCHER 已存在且不是 Debata 启动器，跳过安装 debata 命令。"
+else
+    mkdir -p "$BIN_DIR"
+    cat > "$LAUNCHER" <<EOF
+#!/usr/bin/env bash
+# Debata Agent launcher
+exec "$PYTHON" "$PROJECT_ROOT/main.py" "\$@"
+EOF
+    chmod +x "$LAUNCHER"
+    echo "已安装命令: $LAUNCHER"
+    case ":$PATH:" in
+        *":$BIN_DIR:"*) ;;
+        *) echo "提示：$BIN_DIR 不在 PATH；可以直接用 ./debata，或把它加入 PATH。" ;;
+    esac
+fi
+
 systemctl --user daemon-reload
+
+if [[ "$WRITE_ONLY" -eq 1 ]]; then
+    echo "服务已写入，未启动。运行: debata start"
+    exit 0
+fi
+
 systemctl --user enable --now "$SERVICE_NAME"
 
 LINGER="$(loginctl show-user "$USER" -p Linger --value 2>/dev/null || true)"
@@ -175,10 +208,14 @@ echo
 systemctl --user --no-pager status "$SERVICE_NAME" || true
 echo
 echo "常用命令："
-echo "  状态    : systemctl --user status $SERVICE_NAME --no-pager"
-echo "  日志    : journalctl --user -u $SERVICE_NAME -f"
-echo "  重启    : systemctl --user restart $SERVICE_NAME"
-echo "  停止    : systemctl --user stop $SERVICE_NAME"
+echo "  启动     : debata start"
+echo "  停止     : debata stop"
+echo "  重启     : debata restart"
+echo "  状态     : debata status"
+echo "  日志     : debata log"
+echo "  开机自启 : debata enable"
+echo "  取消自启 : debata disable"
+echo "  （未加入 PATH 时用 ./debata start）"
 if [[ "$HEADLESS" -eq 0 ]]; then
     echo "  WebUI   : http://127.0.0.1:$PORT"
     echo "  令牌文件: ~/.local/share/Debata_Agent/instances/default/webui_token.txt"

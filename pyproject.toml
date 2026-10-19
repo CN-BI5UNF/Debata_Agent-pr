@@ -85,7 +85,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 # 顶层脚本模块：main.py / main_cli.py 不是包，必须显式声明，
 # 否则 [project.scripts] 的 debata 入口装上后会 ModuleNotFoundError。
-py-modules = ["main", "main_cli", "webui_server"]
+py-modules = ["main", "main_cli", "webui_server", "service_cli"]
 
 [tool.setuptools.packages.find]
 include = [

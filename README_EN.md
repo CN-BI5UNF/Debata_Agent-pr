@@ -170,24 +170,27 @@ uv run main.py --test-adapter       # test NapCat connection for 5 seconds
 
 ## Running in the background
 
-For long-running deployments, use a systemd **user** service (no sudo):
+Install once, then use the short `debata` commands:
 
 ```bash
 cd ~/Debata_Agent
-bash scripts/install_systemd_user.sh
-sudo loginctl enable-linger "$USER"     # keep running after logout
+bash scripts/install_systemd_user.sh     # one-time install + start
 
-systemctl --user status debata-agent --no-pager
-journalctl --user -u debata-agent -f
+debata start       # start (auto-installs the service on first run)
+debata stop        # stop
+debata log         # follow logs
+debata enable      # enable boot autostart (and start now)
+debata disable     # disable boot autostart
+debata status      # show status
+debata restart     # restart
 ```
 
-- Starts both the WebUI and the QQ runtime by default.
-- Headless: `bash scripts/install_systemd_user.sh --headless`
-- Custom port: `bash scripts/install_systemd_user.sh --port 9000`
-- Preview the unit: `bash scripts/install_systemd_user.sh --dry-run`
-
-For temporary sessions, use `tmux new -s debata` or `screen -S debata`.
-NapCat must be kept running separately.
+- `debata enable` also tries to enable linger; if it fails, run
+  `sudo loginctl enable-linger "$USER"`.
+- Starts the WebUI and QQ runtime by default. Headless:
+  `bash scripts/install_systemd_user.sh --headless`.
+- If `debata` is not on PATH, use `./debata start`.
+- NapCat must be kept running separately.
 
 Full guide: **[docs/background_running.md](docs/background_running.md)**.
 System-level template: `scripts/systemd/debata-agent.system.service`.

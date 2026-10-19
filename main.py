@@ -34,6 +34,22 @@ logger = logging.getLogger(__name__)
 DEFAULT_WEBUI_HOST = "0.0.0.0"
 DEFAULT_WEBUI_PORT = 8000
 
+# 这些子命令交给 service_cli 处理，避免和正常启动参数混在一起。
+_SERVICE_COMMANDS = frozenset(
+    {
+        "start",
+        "stop",
+        "restart",
+        "status",
+        "log",
+        "enable",
+        "disable",
+        "install",
+        "uninstall",
+        "help",
+    }
+)
+
 
 # ============================================================
 # 日志与事件循环
@@ -177,7 +193,17 @@ async def run_headless(project_root: Path, config_file: Path | None = None) -> N
 
 def main(argv: list[str] | None = None) -> None:
     """同步入口。"""
-    args = parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    if raw_argv and raw_argv[0] in _SERVICE_COMMANDS:
+        # 通过 .venv/bin/debata 启动时，sys.path[0] 是 .venv/bin；显式加入项目根，
+        # 保证 service_cli 在源码运行和可编辑安装下都能导入。
+        project_root_text = str(Path(__file__).resolve().parent)
+        if project_root_text not in sys.path:
+            sys.path.insert(0, project_root_text)
+        from service_cli import main as service_main
+
+        raise SystemExit(service_main(raw_argv))
+    args = parse_args(raw_argv)
     project_root = Path(__file__).resolve().parent
 
     from app_config import AppPaths, initialize_runtime_data

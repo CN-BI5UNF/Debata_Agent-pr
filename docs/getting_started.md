@@ -206,17 +206,22 @@ CLI 向导覆盖主模型、子 Agent、图片理解、天气、TTS、RAG、NapC
 
 ## 7.后台运行
 
-调试完成后，不要让 Debata 依赖 SSH 窗口。推荐 systemd 用户服务：
+调试完成后，不要让 Debata 依赖 SSH 窗口。一次性安装后，用短命令管理：
 
 ```bash
 cd ~/Debata_Agent
-bash scripts/install_systemd_user.sh
-sudo loginctl enable-linger "$USER"
-systemctl --user status debata-agent --no-pager
-journalctl --user -u debata-agent -f
+bash scripts/install_systemd_user.sh   # 一次性安装并启动
+
+debata start       # 启动
+debata stop        # 停止
+debata log         # 查看日志
+debata enable      # 开机自启
+debata disable     # 取消开机自启
+debata status      # 状态
 ```
 
-默认同时启动 WebUI 和 QQ Runtime；只跑 headless 用
+`debata enable` 会尝试开启 linger；如果提示失败，执行
+`sudo loginctl enable-linger "$USER"`。只跑 headless 用
 `bash scripts/install_systemd_user.sh --headless`。
 临时挂机可以用 `tmux new -s debata` 或 `screen -S debata`。
 NapCat 需要单独保持运行。
