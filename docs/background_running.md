@@ -17,6 +17,30 @@ debata disable   # 取消开机自启
 > NapCat 是独立进程，不在本文启动范围内。请先确保 NapCat 已经运行并允许
 > Debata 连接；Debata 断线后会自动重连。
 
+### 没有 systemd 用户会话时
+
+容器、WSL、部分精简系统里，`systemctl --user` 会报
+`Failed to connect to bus`。此时 `debata` 会自动切换到内置后台模式
+（PID 文件 + 独立进程），不需要 `systemd`：
+
+```bash
+debata start      # 启动
+debata stop       # 停止
+debata restart    # 重启
+debata status     # 状态
+debata log        # 日志
+```
+
+- `start/stop/restart/status/log` 都可正常使用。
+- `enable` 会启动后台进程，但无法设置开机自启；请使用容器重启策略，
+  或把 `debata start` 加入 cron `@reboot` / 登录脚本。
+- 运行状态写在项目目录的 `.debata-run/`；应用日志仍在
+  `~/.local/share/Debata_Agent/instances/default/logs/debata.log`。
+- 内置模式不会在进程崩溃后自动拉起；需要自动重启请使用 systemd，
+  或容器的 `restart` 策略。
+- 安装脚本检测不到可用的 systemd 用户 bus 时会跳过 unit 安装，直接启动
+  内置后台模式，不再报错退出。
+
 ---
 
 ## 0. 先确认能前台跑起来

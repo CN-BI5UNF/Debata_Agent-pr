@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![WebUI](https://img.shields.io/badge/UI-WebUI%20%28FastAPI%29-blueviolet.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-1689%20passed-brightgreen.svg)](#testing-and-verification)
+[![Tests](https://img.shields.io/badge/tests-1697%20passed-brightgreen.svg)](#testing-and-verification)
 
 </div>
 
@@ -183,6 +183,10 @@ debata restart     # restart
 
 - `debata enable` also tries to enable linger; if it fails, run
   `sudo loginctl enable-linger "$USER"`.
+- Without a systemd user session (containers, WSL, minimal systems), the CLI
+  falls back to a PID-file background mode: `start/stop/restart/status/log`
+  still work. `enable` starts the process but cannot configure boot autostart;
+  use a container restart policy or cron `@reboot` instead.
 - Starts the WebUI and QQ runtime by default. Headless:
   `bash scripts/install_systemd_user.sh --headless`.
 - If `debata` is not on PATH, use `./debata start`.
@@ -254,7 +258,7 @@ uv sync --extra dev
 .venv/bin/ruff check .
 ```
 
-Local result: **1689 passed**, `ruff check .` clean (Linux / Python 3.12).
+Local result: **1697 passed**, `ruff check .` clean (Linux / Python 3.12).
 The CI matrix is defined in [.github/workflows/test.yml](.github/workflows/test.yml)
 (Ubuntu + Windows, Python 3.11 / 3.12).
 

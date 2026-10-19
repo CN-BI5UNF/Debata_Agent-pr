@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![WebUI](https://img.shields.io/badge/UI-WebUI%20%28FastAPI%29-blueviolet.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-1689%20passed-brightgreen.svg)](#测试与验证)
+[![Tests](https://img.shields.io/badge/tests-1697%20passed-brightgreen.svg)](#测试与验证)
 
 </div>
 
@@ -177,6 +177,7 @@ debata restart     # 重启
 ```
 
 - `debata enable` 会尝试开启 linger；如果提示失败，执行 `sudo loginctl enable-linger "$USER"`。
+- 没有 systemd 用户会话（容器 / WSL / 精简系统）时，会自动切换为内置后台模式：`start/stop/restart/status/log` 仍可用；`enable` 会启动后台进程，但无法设置开机自启，请使用容器重启策略或 cron `@reboot`。
 - 默认同时启动 WebUI 和 QQ Runtime；只跑 headless 用 `bash scripts/install_systemd_user.sh --headless`。
 - 如果 `debata` 不在 PATH，用 `./debata start`。
 - NapCat 是独立进程，需要单独保持运行。
@@ -251,7 +252,7 @@ uv sync --extra dev
 .venv/bin/ruff check .
 ```
 
-当前本地验证结果：**1689 passed**，`ruff check .` 通过（Linux / Python 3.12）。
+当前本地验证结果：**1697 passed**，`ruff check .` 通过（Linux / Python 3.12）。
 CI 矩阵定义在 [.github/workflows/test.yml](.github/workflows/test.yml)（Ubuntu + Windows，Python 3.11 / 3.12）。
 
 Prompt token 基准（只读，不调用模型）：
