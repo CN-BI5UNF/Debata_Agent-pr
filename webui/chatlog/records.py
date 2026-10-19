@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -30,6 +31,14 @@ logger = logging.getLogger("webui.chatlog.records")
 
 ARCHIVE_FETCH_PAGE_SIZE = 500
 EVENT_STORE_QQ_FETCH_LIMIT = 500
+
+# 对话页合并结果缓存：低功耗设备上一次全量合并需要数秒到十几秒，而页面会
+# 连续请求 conversations / display / timeline。缓存按 runtime 对象和历史长度
+# 失效，TTL 只作为兜底；新消息写入 history 后长度变化，下一次请求会重新计算。
+_CHAT_PAGE_CACHE_TTL_SECONDS = 10.0
+_chat_page_cache: dict[
+    tuple[int, int, int], tuple[int, float, list[dict]]
+] = {}
 QQ_VISIBLE_EVENT_TYPES = ("qq_message_received", "qq_message_sent")
 RUNTIME_EVENT_TYPES = (
     "tool_call_started",
@@ -150,10 +159,54 @@ def _runtime_record_severity(rec: dict[str, Any]) -> DisplaySeverity:
     return "info"
 
 
+def clear_chat_page_cache() -> None:
+    """清空对话页缓存（测试或手动刷新时使用）。"""
+    _chat_page_cache.clear()
+
+
+def _merge_and_tag_chat_page_records(
+    *,
+    archive_records: list[dict],
+    event_records: list[dict],
+    timeline_records: list[dict],
+    history_records: list[dict],
+) -> list[dict]:
+    return _tag_record_order(
+        _merge_chat_page_records(
+            archive_records=archive_records,
+            event_records=event_records,
+            timeline_records=timeline_records,
+            history_records=history_records,
+        )
+    )
+
+
 async def _load_chat_page_records(runtime: Any) -> list[dict]:
     started_at = time.perf_counter()
-    step_started_at = started_at
     history = getattr(runtime, "history", None)
+    history_length = 0
+    cacheable = history is not None and callable(getattr(history, "length", None))
+    if cacheable:
+        try:
+            history_length = int(await history.length())
+        except Exception:
+            cacheable = False
+    cache_key = (
+        id(runtime),
+        id(history),
+        id(getattr(runtime, "event_store", None)),
+    )
+    now = time.monotonic()
+    cached = _chat_page_cache.get(cache_key)
+    if (
+        cacheable
+        and cached is not None
+        and cached[0] == history_length
+        and now - cached[1] <= _CHAT_PAGE_CACHE_TTL_SECONDS
+    ):
+        return list(cached[2])
+
+    step_started_at = now
     history_records = list(await history.records() or []) if history is not None else []
     history_elapsed_ms = (time.perf_counter() - step_started_at) * 1000
 
@@ -179,13 +232,12 @@ async def _load_chat_page_records(runtime: Any) -> list[dict]:
         archive_elapsed_ms = (time.perf_counter() - step_started_at) * 1000
 
     step_started_at = time.perf_counter()
-    records = _tag_record_order(
-        _merge_chat_page_records(
-            archive_records=archive_records,
-            event_records=event_records,
-            timeline_records=timeline_records,
-            history_records=history_records,
-        )
+    records = await asyncio.to_thread(
+        _merge_and_tag_chat_page_records,
+        archive_records=archive_records,
+        event_records=event_records,
+        timeline_records=timeline_records,
+        history_records=history_records,
     )
     merge_elapsed_ms = (time.perf_counter() - step_started_at) * 1000
     if logger.isEnabledFor(logging.DEBUG):
@@ -205,6 +257,11 @@ async def _load_chat_page_records(runtime: Any) -> list[dict]:
             len(archive_records),
             len(records),
         )
+    if cacheable:
+        _chat_page_cache[cache_key] = (history_length, time.monotonic(), records)
+        if len(_chat_page_cache) > 8:
+            for stale_key in list(_chat_page_cache)[:-8]:
+                _chat_page_cache.pop(stale_key, None)
     return records
 
 
@@ -227,35 +284,41 @@ async def _load_event_store_records(runtime: Any) -> list[dict[str, Any]]:
 
 
 async def _recent_chat_page_events(event_store: Any) -> list[dict[str, Any]]:
-    events_by_type = getattr(event_store, "events_by_type", None)
-    if callable(events_by_type):
-        events: list[dict[str, Any]] = []
-        for event_type in EVENT_STORE_CHAT_PAGE_EVENT_TYPES:
-            page = await events_by_type(
-                event_type,
-                limit=EVENT_STORE_QQ_FETCH_LIMIT,
+    """读取对话页需要的最近事件。
+
+    之前按 11 种事件类型各查 500 条，再补一次全局扫描；每类查询都会走一次
+    SQLite 连接/装载，在 H618 上累计要 3-4 秒。这里改为一次最近窗口查询，
+    再在内存里按类型过滤，结果对“对话页最近记录”等价，但快一个数量级。
+    """
+    iter_events = getattr(event_store, "iter_events", None)
+    if callable(iter_events):
+        try:
+            page = await iter_events(
+                limit=max(EVENT_STORE_QQ_FETCH_LIMIT * 4, 2000),
                 order="desc",
             )
+        except Exception as e:
+            logger.debug(f"一次扫描 EventStore 最近事件失败，回退按类型查询: {e}")
+        else:
             if isinstance(page, list):
-                events.extend(item for item in page if isinstance(item, dict))
-        iter_events = getattr(event_store, "iter_events", None)
-        if callable(iter_events):
-            try:
-                page = await iter_events(limit=EVENT_STORE_QQ_FETCH_LIMIT, order="desc")
-            except Exception as e:
-                logger.debug(f"补充扫描 EventStore 最近事件失败，已使用按类型查询结果: {e}")
-            else:
-                if isinstance(page, list):
-                    events.extend(item for item in page if isinstance(item, dict))
-        return _sort_unique_chat_page_events(events)
+                return _sort_unique_chat_page_events(
+                    item for item in page if isinstance(item, dict)
+                )
 
-    iter_events = getattr(event_store, "iter_events", None)
-    if not callable(iter_events):
+    # 兼容没有 iter_events 的旧 store。
+    events_by_type = getattr(event_store, "events_by_type", None)
+    if not callable(events_by_type):
         return []
-    page = await iter_events(limit=EVENT_STORE_QQ_FETCH_LIMIT, order="desc")
-    if not isinstance(page, list):
-        return []
-    return _sort_unique_chat_page_events(item for item in page if isinstance(item, dict))
+    events: list[dict[str, Any]] = []
+    for event_type in EVENT_STORE_CHAT_PAGE_EVENT_TYPES:
+        page = await events_by_type(
+            event_type,
+            limit=EVENT_STORE_QQ_FETCH_LIMIT,
+            order="desc",
+        )
+        if isinstance(page, list):
+            events.extend(item for item in page if isinstance(item, dict))
+    return _sort_unique_chat_page_events(events)
 
 
 def _sort_unique_chat_page_events(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1341,9 +1404,26 @@ def _real_record_identity(record: dict[str, Any]) -> tuple[str, str, str] | None
 
 
 async def _load_archive_records_paged(archive: Any) -> list[dict]:
+    """读取归档记录。
+
+    名字保留是为了兼容调用方；实际优先一次 `records()` 取回完整记录。
+    原来的分页实现每页都会重新建连接、做一次 filter + get_by_ids，
+    3.6k 条归档在 H618 上要 15 秒；一次查询约 2 秒。
+    """
+    records_method = getattr(archive, "records", None)
     filter_records = getattr(archive, "filter_records", None)
     if not callable(filter_records):
-        return list(await archive.records() or [])
+        return list(await records_method() or []) if callable(records_method) else []
+    # 只对 SQLite 后端使用一次性加载；测试里的 PagedArchiveStore 或其它
+    # 需要分页的 store 继续走下面的 filter_records 路径。
+    db_backend = getattr(archive, "db", None) or getattr(
+        getattr(archive, "_store", None), "db", None
+    )
+    if callable(records_method) and db_backend is not None:
+        try:
+            return list(await records_method() or [])
+        except Exception as e:
+            logger.warning(f"一次性加载 archive 失败，回退分页: {e}")
 
     records: list[dict] = []
     offset = 0

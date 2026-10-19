@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import socket
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -177,6 +179,33 @@ def _install_routes(app: FastAPI) -> None:
 # ============================================================
 
 
+def _port_available(host: str, port: int) -> bool:
+    """检查端口是否还能绑定。
+
+    在构造 Runtime 之前先检查，避免端口被占用时先加载配置/拉起 Runtime，
+    最后才由 uvicorn 抛出一大段 Errno 98 栈——那看起来像“启动崩溃”。
+    """
+    try:
+        infos = socket.getaddrinfo(
+            host or "0.0.0.0",
+            port,
+            type=socket.SOCK_STREAM,
+        )
+    except socket.gaierror:
+        return True
+    for family, socktype, proto, _, sockaddr in infos:
+        sock = socket.socket(family, socktype, proto)
+        try:
+            if os.name != "nt":
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind(sockaddr)
+        except OSError:
+            return False
+        finally:
+            sock.close()
+    return True
+
+
 def run_webui(
     project_root: Path,
     *,
@@ -189,6 +218,17 @@ def run_webui(
 ) -> None:
     """启动 WebUI（阻塞直到 Ctrl+C）。"""
     import uvicorn
+
+    if not _port_available(host, port):
+        print(
+            f"\n端口 {port} 已被占用，Debata 可能已经在运行。\n"
+            f"  查看状态: debata status\n"
+            f"  查看日志: debata log\n"
+            f"  换端口启动: python main.py --host {host} --port 9000\n",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(1)
 
     runtime_host = RuntimeHost(project_root=project_root, config_file=config_file)
     paths = runtime_host.build_paths()

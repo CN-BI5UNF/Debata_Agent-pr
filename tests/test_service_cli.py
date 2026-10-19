@@ -30,7 +30,7 @@ def test_start_calls_systemctl_start(monkeypatch):
     )
 
     assert service_cli.main(["start"]) == 0
-    assert calls == [["systemctl", "--user", "debata-agent", "start"]]
+    assert calls == [["systemctl", "--user", "start", "debata-agent"]]
 
 
 def test_enable_runs_enable_start_and_linger(monkeypatch):
@@ -57,7 +57,7 @@ def test_enable_runs_enable_start_and_linger(monkeypatch):
 
     assert service_cli.main(["enable"]) == 0
     assert ["systemctl", "--user", "enable", "debata-agent"] in calls
-    assert ["systemctl", "--user", "debata-agent", "start"] in calls
+    assert ["systemctl", "--user", "start", "debata-agent"] in calls
     assert linger_calls
     assert linger_calls[0][:2] == ["loginctl", "enable-linger"]
 

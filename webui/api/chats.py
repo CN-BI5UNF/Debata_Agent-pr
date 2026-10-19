@@ -132,7 +132,15 @@ async def display(
             "filtered_total": 0, "truncated": False,
         }
 
-    raw_records = target.get("records") or []
+    all_records = target.get("records") or []
+    total = len(all_records)
+    raw_records = all_records
+    # 默认只展示最近 300 条，但原实现会先归一化整段会话（大群可能 8k+ 条，
+    # 在 ARM 上要 5 秒）。这里先按 limit 的 4 倍截一个尾部窗口，再做展示项
+    # 归一化；搜索和“只看媒体”需要全量，保持不截断。
+    if limit and not q and not media_only and total > limit * 4:
+        raw_records = all_records[-(limit * 4):]
+
     persona_name = getattr(getattr(rt, "persona", None), "name", "") or ""
     items = build_display_items(
         raw_records,
@@ -146,14 +154,16 @@ async def display(
     )
 
     filtered_total = len(items)
-    truncated = bool(limit) and filtered_total > limit
+    truncated = bool(limit) and (
+        filtered_total > limit or len(raw_records) < total
+    )
     if truncated:
         items = items[-limit:]
 
     return {
         "conversation": _conversation_summary(target),
         "items": display_items_json(items),
-        "total": len(raw_records),
+        "total": total,
         "filtered_total": filtered_total,
         "truncated": truncated,
     }

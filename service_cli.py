@@ -74,7 +74,9 @@ HELP = """Debata 后台服务管理
 
 
 def _systemctl(*args: str) -> list[str]:
-    return ["systemctl", "--user", SERVICE_NAME, *args]
+    # systemctl 的语法是 `systemctl [OPTIONS] COMMAND [UNIT]`，
+    # 服务名必须放在命令之后，否则会把服务名当成未知命令。
+    return ["systemctl", "--user", *args, SERVICE_NAME]
 
 
 def _run(command: list[str]) -> int:

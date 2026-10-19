@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from webui.chatlog import grouping as grouping_module
 from webui.chatlog.grouping import _group_records_by_conversation
 
 
@@ -157,3 +158,78 @@ def test_chats_unknown_assistant_without_context_does_not_attach_to_previous_cha
 
     assert by_key["unknown:history"]["records"][0]["content"] == "后台旧记录"
     assert by_key["private:10001"]["records"][0]["content"] == "hi"
+
+
+def test_grouping_indexes_accepted_messages_instead_of_rescanning(monkeypatch):
+    """send_status 的 accepted_messages 应使用预索引，不能再全量扫描 records。"""
+    records = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call-send",
+                    "function": {
+                        "name": "send_private_messages",
+                        "arguments": json.dumps(
+                            {
+                                "targets": [
+                                    {
+                                        "target_qq": "10001",
+                                        "content": "给一号",
+                                        "order": 1,
+                                        "delay": 0,
+                                    }
+                                ]
+                            },
+                            ensure_ascii=False,
+                        ),
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-send",
+            "conversation_id": "private:10000",
+            "content": json.dumps(
+                {
+                    "send_id": "send-1",
+                    "status": "accepted",
+                    "accepted_messages": [
+                        {
+                            "conversation_id": "private:10001",
+                            "content": "给一号",
+                            "msg_id": "m1",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+        },
+        {
+            "role": "user",
+            "conversation_id": "private:10000",
+            "content": (
+                '<send_status>{"send_id":"send-1","status":"sent",'
+                '"msg_ids":["m1"]}</send_status>'
+            ),
+        },
+    ]
+
+    def fail_scan(*_args, **_kwargs):
+        raise AssertionError("O(n^2) accepted_messages scan should not run")
+
+    monkeypatch.setattr(grouping_module, "_accepted_messages_for_send_id", fail_scan)
+    grouped = _group_records_by_conversation(records)
+    by_key = {item["key"]: item for item in grouped}
+
+    assert "private:10001" in by_key
+    status_record = by_key["private:10001"]["records"][0]
+    assert status_record["_accepted_messages_for_send_status"] == [
+        {
+            "conversation_id": "private:10001",
+            "content": "给一号",
+            "msg_id": "m1",
+        }
+    ]

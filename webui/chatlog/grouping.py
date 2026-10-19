@@ -38,6 +38,27 @@ def _group_records_by_conversation(records: list[dict]) -> list[dict]:
     order: list[str] = []
     current_key: str | None = None
     send_id_targets: dict[str, list[dict[str, str]]] = {}
+    accepted_by_send_id: dict[str, list[dict[str, Any]]] = {}
+
+    # 先做一次索引，避免在主循环里对每条 send_status 都全量扫描 records。
+    # 旧实现是 O(记录数 × send_status 数)，记录一多会从秒级退化到分钟级。
+    for rec in records:
+        if _record_role(rec) == "tool":
+            _remember_send_id_targets(rec, send_id_targets)
+        content = str(rec.get("content") or "")
+        if "accepted_messages" not in content and "send_id" not in content:
+            continue
+        payload = _parse_json_object(content)
+        if not payload:
+            continue
+        send_id = str(payload.get("send_id") or "").strip()
+        if not send_id:
+            continue
+        accepted = payload.get("accepted_messages")
+        if isinstance(accepted, list):
+            accepted_by_send_id.setdefault(send_id, []).extend(
+                dict(item) for item in accepted if isinstance(item, dict)
+            )
 
     def _ensure(key: str, label: str) -> dict:
         if key not in conversations:
@@ -59,8 +80,6 @@ def _group_records_by_conversation(records: list[dict]) -> list[dict]:
 
     for rec in records:
         role = _record_role(rec)
-        if role == "tool":
-            _remember_send_id_targets(rec, send_id_targets)
 
         explicit_cid = rec.get("conversation_id")
         explicit_key = explicit_cid if isinstance(explicit_cid, str) else ""
@@ -75,7 +94,7 @@ def _group_records_by_conversation(records: list[dict]) -> list[dict]:
             send_id = send_status.get("send_id") or ""
             targets = send_id_targets.get(send_id, [])
             if targets:
-                accepted = _accepted_messages_for_send_id(records, send_id)
+                accepted = accepted_by_send_id.get(send_id, [])
                 for info in targets:
                     clone = {
                         **rec,

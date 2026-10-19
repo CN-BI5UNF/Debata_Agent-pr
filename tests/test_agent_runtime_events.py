@@ -524,7 +524,8 @@ async def test_sqlite_projection_failure_does_not_stop_agent_tool_execution(tmp_
     assert stats["projection_error_count"] >= 1
 
     store.fail_projection = False
-    assert await store.wait_projected(2, timeout=1.0)
+    # 低功耗 ARM 设备在系统负载高时，投影线程恢复可能超过 1 秒。
+    assert await store.wait_projected(2, timeout=5.0)
     await store.shutdown()
 
 

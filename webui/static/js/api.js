@@ -21,6 +21,9 @@ export class ApiError extends Error {
 // 单次请求的上限。没有这个超时，后端一旦卡住（换模型、探测密钥、代理挂死），
 // fetch 会一直挂着，调用方的 await 永远不 settle，启动流程就停在白屏上。
 const REQUEST_TIMEOUT_MS = 15000;
+// 对话页首次加载需要汇总历史/事件/归档，在 ARM 设备上可能超过 15 秒；
+// 给这组接口单独放宽超时，后端有缓存，后续请求会很快。
+const CHAT_REQUEST_TIMEOUT_MS = 60000;
 
 async function request(method, path, body, options = {}) {
   const init = {
@@ -79,7 +82,7 @@ async function request(method, path, body, options = {}) {
 }
 
 export const api = {
-  get: (path) => request('GET', path),
+  get: (path, options) => request('GET', path, undefined, options),
   post: (path, body) => request('POST', path, body),
   patch: (path, body) => request('PATCH', path, body),
   put: (path, body) => request('PUT', path, body),
@@ -106,13 +109,21 @@ export const endpoints = {
 
   overview: (range = 'today') => api.get(`/api/overview?range=${encodeURIComponent(range)}`),
 
-  conversations: () => api.get('/api/chats/conversations'),
+  conversations: () =>
+    api.get('/api/chats/conversations', { timeoutMs: CHAT_REQUEST_TIMEOUT_MS }),
   conversation: (id, limit = 300) =>
-    api.get(`/api/chats/conversation?conversation_id=${encodeURIComponent(id)}&limit=${limit}`),
+    api.get(
+      `/api/chats/conversation?conversation_id=${encodeURIComponent(id)}&limit=${limit}`,
+      { timeoutMs: CHAT_REQUEST_TIMEOUT_MS },
+    ),
   // 结构化显示项（工具调用↔结果已配对、回执已去重），q 直接是查询串
-  display: (query) => api.get(`/api/chats/display?${query}`),
+  display: (query) =>
+    api.get(`/api/chats/display?${query}`, { timeoutMs: CHAT_REQUEST_TIMEOUT_MS }),
   timeline: (id = '', limit = 100) =>
-    api.get(`/api/chats/timeline?conversation_id=${encodeURIComponent(id)}&limit=${limit}`),
+    api.get(
+      `/api/chats/timeline?conversation_id=${encodeURIComponent(id)}&limit=${limit}`,
+      { timeoutMs: CHAT_REQUEST_TIMEOUT_MS },
+    ),
   inject: (payload) => api.post('/api/chats/inject', payload),
   send: (payload) => api.post('/api/chats/send', payload),
 
