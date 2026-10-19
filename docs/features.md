@@ -57,3 +57,11 @@ API 密钥用 AES-256-GCM + RSA-2048 加密, 存系统 keyring, 不需要记密�
 设置页实时保存; 日志页实时跟随; 对话页带「模拟入站消息」输入框, 不接 QQ 也能先试跑人格.
 
 默认带令牌鉴权（启动时打印, 也可 `--token` 固定）, 详见 [WebUI 说明](webui.md).
+
+### 9. Token 效率与后台运行（2026-10）
+
+- **模型视图**：只裁剪发给模型的旧 `task_context`、发送回执和 `no_action` 配对；历史、归档、事件库原样保留。
+- **工具 schema 分级**：高频工具直出核心字段，低频/高风险工具按需 `tool_search detail=full`，固定 schema 开销约减半。
+- **发送成功自动收尾**：不再为收尾额外跑一次 `no_action` 模型调用。
+- **Token 计量**：规范 JSON 估算 messages + tools，按 provider/model 持久化校准，设置页可看估算误差和未命中输入。
+- **后台运行**：systemd 用户/系统服务、tmux、screen、nohup，一键安装脚本和完整排错文档见 [后台运行指南](background_running.md)。

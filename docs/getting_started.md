@@ -15,16 +15,18 @@ NapCat 启动后，记下它的 WebSocket 地址和 token（如果设了的话�
 ## 2.安装 Debata
 
 ```bash
-git clone https://github.com/binglang001/Debata_Agent.git
+gh auth login                 # 私有仓库需要先登录 GitHub
+git clone https://github.com/CN-BI5UNF/Debata_Agent.git
 cd Debata_Agent
 
-python -m pip install uv    # 没装 uv 的话先装
+python -m pip install uv      # 没装 uv 的话先装
 uv sync
 uv run main.py
 ```
 
 启动后终端会打印访问地址和令牌，浏览器打开即可。首次启动检测不到配置会自动进入配置向导，
 以后启动直接进仪表盘。纯命令行环境跑 `uv run main.py --no-gui`，不启动 WebUI。
+后台长期运行见 [后台运行指南](background_running.md)。
 
 环境要求：Python 3.11+，一个 LLM API 密钥（推荐 [DeepSeek](https://platform.deepseek.com)）。
 
@@ -34,7 +36,7 @@ Linux 服务器或 SSH 环境可以直接跑纯 CLI 向导：
 uv run main.py --no-gui --setup
 ```
 
-CLI 向导覆盖主模型、子 Agent、图片理解、天气、TTS、RAG、NapCat 和人格等主要配置。密钥优先保存到系统 keyring；如果 Linux 没有可用 Secret Service，会自动退回 `data/rsa_private.pem` 本地私钥文件，并使用 0600 权限保护。
+CLI 向导覆盖主模型、子 Agent、图片理解、天气、TTS、RAG、NapCat 和人格等主要配置。密钥优先保存到系统 keyring；如果 Linux 没有可用 Secret Service，会自动退回数据目录下的 `rsa_private.pem` 本地私钥文件（默认 `~/.local/share/Debata_Agent/instances/default/rsa_private.pem`），并使用 0600 权限保护。
 
 ---
 
@@ -159,7 +161,7 @@ CLI 向导覆盖主模型、子 Agent、图片理解、天气、TTS、RAG、NapC
 侧栏「表情包」页 → 「添加表情包」：拖图片进去，或点开选择文件。可以在上传前逐个改名——
 **名字就是 AI 引用时用的名字**，建议起容易懂的（如「笑哭」「困」而不是 `emoji_0142`）。
 
-也可以直接把图片丢进 `data/emoji/` 目录，效果一样。支持 png / jpg / jpeg / gif，单个不超过 5MB。
+也可以直接把图片丢进数据目录的 `emoji/`（默认 `~/.local/share/Debata_Agent/instances/default/emoji/`），效果一样。支持 png / jpg / jpeg / gif，单个不超过 5MB。
 重名会自动加 `_1` 后缀。
 
 ### 改模型 / 加中转站
@@ -180,7 +182,7 @@ CLI 向导覆盖主模型、子 Agent、图片理解、天气、TTS、RAG、NapC
 
 ### 调上下文预算
 
-设置页 → Token预算 → 滚动摘要压缩，可以调触发滚动摘要的上下文占比、压缩后的活跃窗口目标，以及第一次压缩仍超预算时的重试压缩目标。正常使用建议保留默认值；这里不再提供“保留最近 N 条工作历史”一类旧裁剪开关。
+设置页 → Token预算 → 滚动摘要压缩，可以调触发滚动摘要的上下文占比、压缩后的活跃窗口目标，以及第一次压缩仍超预算时的重试压缩目标。当前默认是 50/30/20，并启用模型视图（只裁剪发给模型的旧运行时快照，不删除落盘历史）。正常使用建议保留默认值；这里不再提供“保留最近 N 条工作历史”一类旧裁剪开关。
 
 ### 调主题
 
@@ -198,7 +200,7 @@ CLI 向导覆盖主模型、子 Agent、图片理解、天气、TTS、RAG、NapC
 - **AI 现场捏一个**: 向导里描述「我想要一个 25 岁的程序员、嘴硬心软、爱猫」, 等几秒看 AI 写出来
 - **手写**: 照 `personas/debata/persona_prompt.py` 葫芦画瓢, 放到 `personas/{你的名字}/`
 
-#### 每个 persona 都有自己独立的 `data/memory/{name}/` 目录存历史与重要记忆, 互不干扰.
+#### 每个 persona 都有自己独立的 `memory/{name}/` 目录存历史与重要记忆（默认数据目录 `~/.local/share/Debata_Agent/instances/default/`），互不干扰.
 
 ---
 

@@ -136,6 +136,8 @@ IAdapter.send_text() → 用户收到消息
 
 `range_start_messages`、`range_end_messages` 以及 `behavior.context` 中旧的“活跃历史保底 / 保留最近 N 条运行时记录”字段已经废弃；主动思考路由器使用独立的 `proactive_router_*` 预算字段，不参与主聊天历史裁剪。
 
+压缩触发/目标按“**模型可见视图 token + 固定 system/tools 开销**”计算，而不是原始活跃历史；默认 `50/30/20`（触发/目标/重试）。模型视图见下一节。
+
 ---
 
 ## 模型视图（运行时噪声裁剪）
@@ -314,6 +316,12 @@ uv run python -m pytest tests/ -q --ignore=tests/test_kv_cache_real.py
 - **aiofiles** 替代同步文件 IO
 - **JSONL 增量追加**（HistoryManager）替代每次重写整个 JSON
 - **KV 缓存前缀稳定**（context_builder）
+- **模型视图裁剪**（`core/model_view.py`）：旧运行时快照/回执/no_action 不再进入 prompt
+- **工具 schema 分级**（`tools/base.py`）：compact + stub + `tool_search detail=full`
+- **发送成功自动收尾**（`agents/runner.py`）：省掉一次 `no_action` 模型调用
+- **Token 计量**（`utils/token_budget.py` + `core/token_calibration.py`）：规范 JSON、持久化校准、编码缓存
+- **KV 诊断分级**（`agents/runner.py`）：默认 `summary`，不再每轮多次全量序列化
 - **WebSocket 长连接 + 心跳**（NapCatAdapter）
 
+基准脚本：`scripts/benchmark_prompt_tokens.py`（只读，不调用模型）。
 详见 [KV 缓存基准](kv_cache_benchmark.md)。

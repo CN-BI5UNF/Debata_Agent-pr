@@ -15,6 +15,8 @@
 - 新增 `scripts/install_systemd_user.sh` 一键安装脚本和 `scripts/systemd/` 单元模板。
 
 ### Changed
+- README 中英文重写：补充 Token 效率、后台运行、数据目录、测试与安全说明；clone 地址更新为私有仓库。
+- 更新 getting_started / features / architecture / kv_cache_benchmark，加入模型视图、compact 工具、自动收尾与 2026-10 基准数据。
 - 滚动摘要触发/目标默认从 75%/50%/30% 调整为 50%/30%/20%，并按“模型可见视图 + 固定开销”口径计算；128k 工作预算需要在设置页或实例配置中显式设置。
 - KV 诊断默认改为 `summary` 轻量模式，不再每轮对完整消息与工具集做多次全量 JSON 序列化。
 - 工具 schema 移除通用 `finish_after_success` 参数；执行层仍兼容旧调用。
