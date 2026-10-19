@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![WebUI](https://img.shields.io/badge/UI-WebUI%20%28FastAPI%29-blueviolet.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-1679%20passed-brightgreen.svg)](#testing-and-verification)
+[![Tests](https://img.shields.io/badge/tests-1689%20passed-brightgreen.svg)](#testing-and-verification)
 
 </div>
 
@@ -124,14 +124,10 @@ What changed:
 
 ## Quick start
 
-> This is a private repository. You need GitHub access before cloning.
-> The public upstream is linked in [License and acknowledgements](#license-and-acknowledgements).
-
 ### 1. Get the code and install dependencies
 
 ```bash
-gh auth login
-git clone https://github.com/CN-BI5UNF/Debata_Agent.git
+git clone https://github.com/binglang001/Debata_Agent.git
 cd Debata_Agent
 
 uv sync
@@ -140,7 +136,7 @@ uv sync
 Or with SSH:
 
 ```bash
-git clone git@github.com:CN-BI5UNF/Debata_Agent.git
+git clone git@github.com:binglang001/Debata_Agent.git
 cd Debata_Agent
 uv sync
 ```
@@ -258,7 +254,7 @@ uv sync --extra dev
 .venv/bin/ruff check .
 ```
 
-Local result: **1679 passed**, `ruff check .` clean (Linux / Python 3.12).
+Local result: **1689 passed**, `ruff check .` clean (Linux / Python 3.12).
 The CI matrix is defined in [.github/workflows/test.yml](.github/workflows/test.yml)
 (Ubuntu + Windows, Python 3.11 / 3.12).
 
@@ -310,14 +306,14 @@ Prompt-token benchmark (read-only, no model calls):
   LAN.
 - For public access, use Nginx/Caddy with HTTPS, or bind to `127.0.0.1`.
 - Run system services as a dedicated user, never as root.
-- Chat history, personas, and configuration in this private repository are
-  personal data; back up and sanitize before sharing.
+- Chat history, personas, and configuration are personal data; back up and
+  sanitize before sharing.
 
 ## License and acknowledgements
 
-This repository is a private refactor based on
+This project is maintained by
 [binglang001/Debata_Agent](https://github.com/binglang001/Debata_Agent)
-(Apache-2.0). Original copyright and license notices are preserved.
+and its contributors. Original copyright and license notices are preserved.
 
 [Apache 2.0](LICENSE) — free for commercial use, modification, and distribution.
 
@@ -327,7 +323,7 @@ Acknowledgements:
 - [FastAPI](https://fastapi.tiangolo.com/) — WebUI HTTP / WebSocket framework
 - [Uvicorn](https://www.uvicorn.org/) — ASGI server
 - [uv](https://github.com/astral-sh/uv) — Python dependency and environment manager
-- DeepSeek / Anthropic / Zhipu and other LLM providers
+- Everyone who filed issues, opened pull requests, or helped with testing
 
 ---
 

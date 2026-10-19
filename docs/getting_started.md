@@ -15,8 +15,7 @@ NapCat 启动后，记下它的 WebSocket 地址和 token（如果设了的话�
 ## 2.安装 Debata
 
 ```bash
-gh auth login                 # 私有仓库需要先登录 GitHub
-git clone https://github.com/CN-BI5UNF/Debata_Agent.git
+git clone https://github.com/binglang001/Debata_Agent.git
 cd Debata_Agent
 
 python -m pip install uv      # 没装 uv 的话先装

@@ -16,7 +16,7 @@
 - 新增简化服务命令：`debata start` / `stop` / `restart` / `status` / `log` / `enable` / `disable`，底层自动调用 systemd；首次 `debata start` 会自动安装服务。
 
 ### Changed
-- README 中英文重写：补充 Token 效率、后台运行、数据目录、测试与安全说明；clone 地址更新为私有仓库。
+- README 中英文重写：补充 Token 效率、后台运行、数据目录、测试与安全说明；clone 地址更新为本项目仓库。
 - 更新 getting_started / features / architecture / kv_cache_benchmark，加入模型视图、compact 工具、自动收尾与 2026-10 基准数据。
 - 滚动摘要触发/目标默认从 75%/50%/30% 调整为 50%/30%/20%，并按“模型可见视图 + 固定开销”口径计算；128k 工作预算需要在设置页或实例配置中显式设置。
 - KV 诊断默认改为 `summary` 轻量模式，不再每轮对完整消息与工具集做多次全量 JSON 序列化。

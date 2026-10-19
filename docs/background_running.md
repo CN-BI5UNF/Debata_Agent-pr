@@ -146,7 +146,7 @@ sudo chown -R debata:debata /opt/Debata_Agent
 # 用 debata 用户完成部署：
 sudo -u debata -H bash
 cd /opt/Debata_Agent
-git clone https://github.com/CN-BI5UNF/Debata_Agent.git .
+git clone https://github.com/binglang001/Debata_Agent.git .
 uv sync
 exit
 

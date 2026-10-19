@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![WebUI](https://img.shields.io/badge/UI-WebUI%20%28FastAPI%29-blueviolet.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-1679%20passed-brightgreen.svg)](#测试与验证)
+[![Tests](https://img.shields.io/badge/tests-1689%20passed-brightgreen.svg)](#测试与验证)
 
 </div>
 
@@ -103,14 +103,10 @@ Debata_Agent 不绑定任何特定角色。你给它一个人格，它就活成�
 
 ## 快速开始
 
-> 本仓库是私有重构仓库，clone 前需要 GitHub 登录与访问权限。
-> 公开上游见 [License 与致谢](#license-与致谢)。
-
 ### 1. 获取代码并安装依赖
 
 ```bash
-gh auth login                     # 私有仓库需要先登录 GitHub
-git clone https://github.com/CN-BI5UNF/Debata_Agent.git
+git clone https://github.com/binglang001/Debata_Agent.git
 cd Debata_Agent
 
 uv sync
@@ -119,7 +115,7 @@ uv sync
 如果使用 SSH：
 
 ```bash
-git clone git@github.com:CN-BI5UNF/Debata_Agent.git
+git clone git@github.com:binglang001/Debata_Agent.git
 cd Debata_Agent
 uv sync
 ```
@@ -255,7 +251,7 @@ uv sync --extra dev
 .venv/bin/ruff check .
 ```
 
-当前本地验证结果：**1679 passed**，`ruff check .` 通过（Linux / Python 3.12）。
+当前本地验证结果：**1689 passed**，`ruff check .` 通过（Linux / Python 3.12）。
 CI 矩阵定义在 [.github/workflows/test.yml](.github/workflows/test.yml)（Ubuntu + Windows，Python 3.11 / 3.12）。
 
 Prompt token 基准（只读，不调用模型）：
@@ -298,12 +294,12 @@ Prompt token 基准（只读，不调用模型）：
 - WebUI 默认启用令牌鉴权；`--no-auth` 只适合完全可信的内网。
 - 公网访问请使用 Nginx / Caddy 反向代理 + HTTPS，或只监听 `127.0.0.1`。
 - 系统级服务请使用专用用户运行，不要用 root 跑长期服务。
-- 私有仓库中的聊天记录、人格、配置属于个人数据；迁移或分享前请先备份并脱敏。
+- 聊天记录、人格、配置属于个人数据；迁移或分享前请先备份并脱敏。
 
 ## License 与致谢
 
-本项目基于 [binglang001/Debata_Agent](https://github.com/binglang001/Debata_Agent)
-（Apache-2.0）进行重构与维护，保留原始版权与协议声明。
+本项目由 [binglang001/Debata_Agent](https://github.com/binglang001/Debata_Agent)
+及其贡献者共同维护，保留原始版权与协议声明。
 
 [Apache 2.0](LICENSE) — 自由商用 / 修改 / 分发，保留版权与协议声明即可。
 
@@ -313,8 +309,8 @@ Prompt token 基准（只读，不调用模型）：
 - [FastAPI](https://fastapi.tiangolo.com/) — WebUI 的 HTTP / WebSocket 框架
 - [Uvicorn](https://www.uvicorn.org/) — ASGI 服务器
 - [uv](https://github.com/astral-sh/uv) — Python 依赖与虚拟环境管理
-- DeepSeek / Anthropic / 智谱 等提供 LLM 服务
+- 所有提交 Issue / PR 以及参与测试的贡献者
 
 ---
 
-如果这个项目对你有用，欢迎在私有仓库里继续维护；也请给上游项目一个 Star。
+如果这个项目对你有用，欢迎给项目一个 Star，也欢迎提交 Issue / PR。
